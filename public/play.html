@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ThumbWar — Play</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="page-play">
+    <header class="topbar">
+      <div class="brand small">
+        <a href="/" class="brand-link">
+          <span class="brand-play">▶</span>
+          <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
+        </a>
+      </div>
+      <div class="topbar-right">
+        <span id="room-code-pill" class="pill">—</span>
+        <span id="timer-pill" class="pill pill-timer" hidden>--</span>
+      </div>
+    </header>
+
+    <main id="app"></main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <template id="tpl-lobby">
+      <section class="lobby panel">
+        <h1>Waiting for players</h1>
+        <p class="lobby-code-row">
+          Room code:
+          <code id="lobby-code" class="big-code">----</code>
+          <button class="btn btn-ghost btn-sm" id="copy-code">Copy</button>
+          <button class="btn btn-ghost btn-sm" id="open-display">Open display</button>
+        </p>
+        <div class="player-grid" id="lobby-players"></div>
+        <div class="lobby-actions">
+          <label class="spectator-toggle">
+            <input type="checkbox" id="spectator" /> Spectator mode (don't play, just watch)
+          </label>
+          <button class="btn btn-primary btn-lg" id="start-btn">Start Game</button>
+        </div>
+        <p class="muted small" id="host-hint"></p>
+      </section>
+    </template>
+
+    <template id="tpl-writing">
+      <section class="writing panel">
+        <h1>Write a YouTube title</h1>
+        <p class="muted">Pick a persona, then write a title a video like that would have.</p>
+
+        <div class="write-grid">
+          <div class="col">
+            <h3>Your persona</h3>
+            <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. Santa Claus, My Wife, A Cult Leader" />
+            <p class="muted tiny">Or pick a suggestion:</p>
+            <div id="persona-suggestions" class="chip-wrap"></div>
+          </div>
+
+          <div class="col">
+            <h3>Title format <span class="muted tiny">(optional)</span></h3>
+            <p class="muted tiny">Tap a format and the blanks become part of your title.</p>
+            <div id="format-suggestions" class="format-wrap"></div>
+          </div>
+        </div>
+
+        <h3>Your title</h3>
+        <textarea id="title-input" class="input-xl" maxlength="120" placeholder="I Let Santa Run My Business for 24 Hours"></textarea>
+        <div class="writing-actions">
+          <span id="writing-status" class="muted"></span>
+          <button class="btn btn-primary btn-lg" id="submit-title">Submit Title</button>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-drawing">
+      <section class="drawing panel">
+        <div class="drawing-header">
+          <div>
+            <h1 id="drawing-title">Draw the thumbnail</h1>
+            <p class="muted" id="drawing-persona"></p>
+          </div>
+          <div class="task-pager">
+            <button class="btn btn-ghost btn-sm" id="prev-task">◀</button>
+            <span id="task-label" class="pill">Title 1 / 1</span>
+            <button class="btn btn-ghost btn-sm" id="next-task">▶</button>
+          </div>
+        </div>
+
+        <div class="toolbar" id="toolbar">
+          <div class="tool-group">
+            <button data-tool="pen" class="tool active" title="Pen">✏️</button>
+            <button data-tool="eraser" class="tool" title="Eraser">🧽</button>
+            <button data-tool="fill" class="tool" title="Fill">🪣</button>
+            <button data-tool="line" class="tool" title="Line">／</button>
+            <button data-tool="rect" class="tool" title="Rectangle">▭</button>
+            <button data-tool="circle" class="tool" title="Circle">◯</button>
+            <button data-tool="arrow" class="tool" title="Arrow">➜</button>
+            <button data-tool="text" class="tool" title="Text">T</button>
+          </div>
+
+          <div class="tool-group">
+            <label class="ctl">
+              Size
+              <input type="range" id="size" min="1" max="80" value="6" />
+            </label>
+            <label class="ctl">
+              Text
+              <input type="range" id="text-size" min="10" max="120" value="48" />
+            </label>
+            <label class="ctl">
+              Opacity
+              <input type="range" id="opacity" min="10" max="100" value="100" />
+            </label>
+          </div>
+
+          <div class="tool-group">
+            <div id="palette" class="palette"></div>
+            <label class="ctl">
+              <input type="color" id="custom-color" value="#ff0000" />
+            </label>
+          </div>
+
+          <div class="tool-group">
+            <button class="btn btn-ghost btn-sm" id="undo">Undo</button>
+            <button class="btn btn-ghost btn-sm" id="redo">Redo</button>
+            <button class="btn btn-ghost btn-sm" id="clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="canvas-shell">
+          <canvas id="thumb" width="1280" height="720"></canvas>
+        </div>
+
+        <div class="drawing-footer">
+          <span id="drawing-status" class="muted"></span>
+          <button class="btn btn-primary btn-lg" id="submit-drawing">Submit Thumbnail</button>
+        </div>
+      </section>
+    </template>
+
+    <template id="tpl-voting">
+      <section class="voting panel">
+        <h1 id="vote-title-row"></h1>
+        <p class="muted" id="vote-progress"></p>
+        <p class="vote-question">Which video would you click?</p>
+        <div id="thumb-choices" class="thumb-choices"></div>
+        <p id="vote-status" class="muted"></p>
+      </section>
+    </template>
+
+    <template id="tpl-browse">
+      <section class="browse panel">
+        <h1>Browse Page</h1>
+        <p class="muted">Vote in each category. Artists revealed after results.</p>
+        <div class="browse-tabs" id="browse-tabs">
+          <button class="tab active" data-cat="funniest">😂 Funniest</button>
+          <button class="tab" data-cat="clickbait">🎣 Most Clickbait</button>
+          <button class="tab" data-cat="interesting">🤔 Most Interesting</button>
+        </div>
+        <div id="browse-grid" class="browse-grid"></div>
+        <p id="browse-status" class="muted"></p>
+      </section>
+    </template>
+
+    <template id="tpl-results">
+      <section class="results panel">
+        <h1 id="champion-headline">🏆 ThumbWar Champion</h1>
+        <div id="champion-card" class="champion-card"></div>
+        <h2>Final Scores</h2>
+        <ol id="scoreboard" class="scoreboard"></ol>
+        <h2>Awards</h2>
+        <div id="awards" class="awards-grid"></div>
+        <h2>The Browse Page</h2>
+        <div id="final-gallery" class="browse-grid"></div>
+        <div class="results-footer">
+          <button class="btn btn-primary" id="play-again">Play Again</button>
+        </div>
+      </section>
+    </template>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/canvas.js"></script>
+    <script src="/js/play.js"></script>
+  </body>
+</html>

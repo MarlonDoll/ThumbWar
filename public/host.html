@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ThumbWar — Display</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="page-host">
+    <header class="host-topbar">
+      <div class="brand">
+        <span class="brand-play">▶</span>
+        <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
+      </div>
+      <div class="host-topbar-right">
+        <span id="room-code-pill" class="pill pill-xl">—</span>
+        <span id="timer-pill" class="pill pill-xl pill-timer" hidden>--</span>
+      </div>
+    </header>
+    <main id="host-app"></main>
+
+    <template id="host-tpl-lobby">
+      <section class="host-lobby">
+        <h1>Join at <span id="join-host">thumb.war</span></h1>
+        <div class="big-code-row">
+          <div class="big-code-xxl" id="big-code">----</div>
+        </div>
+        <h2>Players in the room</h2>
+        <div class="player-grid big" id="host-players"></div>
+        <p class="host-tip">Waiting for the host to start…</p>
+      </section>
+    </template>
+
+    <template id="host-tpl-writing">
+      <section class="host-phase">
+        <h1>✍️ Writing titles</h1>
+        <p class="subtitle">Pick a persona. Write a YouTube title. Make it clickable.</p>
+        <div class="submit-tracker" id="host-submit-tracker"></div>
+        <div class="big-timer" id="big-timer">--:--</div>
+      </section>
+    </template>
+
+    <template id="host-tpl-drawing">
+      <section class="host-phase">
+        <h1>🎨 Drawing thumbnails</h1>
+        <p class="subtitle">No peeking! Blind thumbnail battles are incoming.</p>
+        <div class="submit-tracker" id="host-draw-tracker"></div>
+        <div class="big-timer" id="big-timer">--:--</div>
+      </section>
+    </template>
+
+    <template id="host-tpl-voting">
+      <section class="host-phase voting-phase">
+        <h1 id="host-vote-title"></h1>
+        <p class="subtitle" id="host-vote-sub"></p>
+        <div class="host-thumb-row" id="host-thumb-row"></div>
+        <div class="big-timer" id="big-timer">--:--</div>
+      </section>
+    </template>
+
+    <template id="host-tpl-browse">
+      <section class="host-phase">
+        <h1>📺 The Browse Page</h1>
+        <p class="subtitle">Pick your funniest, most clickbait, and most interesting concepts.</p>
+        <div class="browse-grid host" id="host-browse-grid"></div>
+        <div class="big-timer" id="big-timer">--:--</div>
+      </section>
+    </template>
+
+    <template id="host-tpl-results">
+      <section class="host-phase">
+        <h1>🏆 ThumbWar Champion</h1>
+        <div id="host-champion" class="champion-card xl"></div>
+        <h2>Scores</h2>
+        <ol id="host-scoreboard" class="scoreboard big"></ol>
+        <h2>Awards</h2>
+        <div id="host-awards" class="awards-grid big"></div>
+      </section>
+    </template>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/host.js"></script>
+  </body>
+</html>

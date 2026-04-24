@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ThumbWar</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="page-landing">
+    <div class="landing">
+      <header class="landing-header">
+        <div class="brand">
+          <span class="brand-play">▶</span>
+          <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
+        </div>
+        <p class="tagline">Write fake YouTube titles. Draw clickbait thumbnails. Vote like you're scrolling.</p>
+      </header>
+
+      <main class="landing-main">
+        <section class="card">
+          <h2>Create a room</h2>
+          <form id="create-form" class="form">
+            <label>
+              Your name
+              <input name="name" maxlength="20" required placeholder="MrBeast Jr." />
+            </label>
+            <button type="submit" class="btn btn-primary">Create Room</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Join a room</h2>
+          <form id="join-form" class="form">
+            <label>
+              Room code
+              <input name="code" maxlength="4" required placeholder="ABCD" autocapitalize="characters" />
+            </label>
+            <label>
+              Your name
+              <input name="name" maxlength="20" required placeholder="Creator" />
+            </label>
+            <button type="submit" class="btn btn-primary">Join Room</button>
+          </form>
+          <p id="join-error" class="error" hidden></p>
+        </section>
+
+        <section class="card card-muted">
+          <h2>Display screen?</h2>
+          <p>Projecting on a TV or streaming? Open a shareable host view.</p>
+          <form id="host-form" class="form row">
+            <input name="code" maxlength="4" required placeholder="Room code" autocapitalize="characters" />
+            <button type="submit" class="btn btn-ghost">Open Display</button>
+          </form>
+        </section>
+      </main>
+
+      <footer class="landing-footer">
+        <small>Prototype · <a href="/play" id="resume-link" hidden>Resume last session</a></small>
+      </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/landing.js"></script>
+  </body>
+</html>
