@@ -81,15 +81,16 @@
 
     <template id="tpl-drawing">
       <section class="drawing panel">
-        <div class="drawing-header">
-          <div>
-            <h1 id="drawing-title">Draw the thumbnail</h1>
-            <p class="muted" id="drawing-persona"></p>
-          </div>
-          <div class="task-pager">
-            <button class="btn btn-ghost btn-sm" id="prev-task">◀</button>
-            <span id="task-label" class="pill">Title 1 / 1</span>
-            <button class="btn btn-ghost btn-sm" id="next-task">▶</button>
+        <div class="prompt-card">
+          <div class="prompt-label">🎨 Draw a thumbnail for this video</div>
+          <div class="prompt-title" id="drawing-title">…</div>
+          <div class="prompt-meta">
+            <span class="prompt-persona" id="drawing-persona"></span>
+            <span class="task-pager">
+              <button class="btn btn-ghost btn-sm" id="prev-task">◀ prev</button>
+              <span id="task-label" class="pill">Title 1 / 1</span>
+              <button class="btn btn-ghost btn-sm" id="next-task">next ▶</button>
+            </span>
           </div>
         </div>
 

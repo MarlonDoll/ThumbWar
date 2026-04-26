@@ -142,7 +142,6 @@
     const personaChips = document.getElementById('persona-suggestions');
     const formatWrap = document.getElementById('format-suggestions');
     const submitBtn = document.getElementById('submit-title');
-    const statusEl = document.getElementById('writing-status');
 
     const priv = state.private || {};
     const sugg = priv.suggestions || { personas: [], formats: [] };
@@ -169,7 +168,6 @@
       b.className = 'format-btn';
       b.textContent = f;
       b.onclick = () => {
-        // Replace [X] with the chosen persona if present.
         const personaVal = personaInput.value.trim();
         let filled = f;
         if (personaVal) {
@@ -184,16 +182,7 @@
     if (priv.myTitle) {
       personaInput.value = priv.myTitle.persona || '';
       titleInput.value = priv.myTitle.title || '';
-      statusEl.textContent = '✓ Submitted — you can edit and resubmit while others finish.';
     }
-
-    const submittedCount = (state.public.writing && state.public.writing.submitted)
-      ? state.public.writing.submitted.length
-      : 0;
-    const total = state.public.players.filter((p) => !p.spectator).length;
-    const info = document.createElement('span');
-    info.textContent = ` · ${submittedCount}/${total} submitted`;
-    statusEl.appendChild(info);
 
     submitBtn.onclick = () => {
       const title = titleInput.value.trim();
@@ -207,6 +196,18 @@
         }
       );
     };
+
+    updateWritingStatus();
+  }
+
+  function updateWritingStatus() {
+    const statusEl = document.getElementById('writing-status');
+    if (!statusEl) return;
+    const submittedCount = state.public.writing?.submitted?.length || 0;
+    const total = state.public.players.filter((p) => !p.spectator).length;
+    const priv = state.private || {};
+    const mine = priv.myTitle ? '✓ Submitted — you can edit and resubmit. ' : '';
+    statusEl.textContent = `${mine}${submittedCount}/${total} players submitted`;
   }
 
   function renderDrawing() {
@@ -244,39 +245,54 @@
 
     function loadActiveTask() {
       const t = tasks[state.drawing.activeIndex];
+      const btn = document.getElementById('submit-drawing');
       if (!t) {
         document.getElementById('drawing-title').textContent = 'All done!';
         document.getElementById('drawing-persona').textContent = '';
         document.getElementById('task-label').textContent = '—';
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'No more thumbnails';
+        }
         return;
       }
       document.getElementById('drawing-title').textContent = t.title.title;
       document.getElementById('drawing-persona').textContent = `Persona: ${t.title.persona}`;
-      document.getElementById('task-label').textContent = `Title ${state.drawing.activeIndex + 1} / ${tasks.length}`;
+      document.getElementById('task-label').textContent = `${state.drawing.activeIndex + 1} / ${tasks.length}`;
       const cached = state.drawing.cachedPngs[t.writerId];
       canvas.loadPng(cached || null);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = t.submitted ? '✓ Submitted — Resubmit?' : 'Submit Thumbnail';
+      }
     }
 
     function submitCurrentDrawing() {
       const t = tasks[state.drawing.activeIndex];
       if (!t) return;
+      const btn = document.getElementById('submit-drawing');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
       const png = canvas.toDataURL();
       state.drawing.cachedPngs[t.writerId] = png;
       socket.emit('submit-drawing', { writerId: t.writerId, png }, (res) => {
-        if (res && res.error) showToast(res.error);
-        else {
-          showToast('Thumbnail submitted');
-          // Auto-advance to next unsubmitted task
-          const nextIdx = tasks.findIndex((x, i) => i > state.drawing.activeIndex && !x.submitted);
-          if (nextIdx >= 0) {
-            state.drawing.activeIndex = nextIdx;
+        btn.disabled = false;
+        if (res && res.error) {
+          btn.textContent = 'Try Submitting Again';
+          showToast('Submit failed: ' + res.error);
+          return;
+        }
+        btn.textContent = '✓ Submitted — Resubmit?';
+        showToast('Thumbnail submitted!');
+        const nextIdx = tasks.findIndex((x, i) => i > state.drawing.activeIndex && !x.submitted);
+        if (nextIdx >= 0) {
+          state.drawing.activeIndex = nextIdx;
+          loadActiveTask();
+        } else {
+          const firstUnsub = tasks.findIndex((x) => !x.submitted);
+          if (firstUnsub >= 0 && firstUnsub !== state.drawing.activeIndex) {
+            state.drawing.activeIndex = firstUnsub;
             loadActiveTask();
-          } else {
-            const firstUnsub = tasks.findIndex((x) => !x.submitted);
-            if (firstUnsub >= 0 && firstUnsub !== state.drawing.activeIndex) {
-              state.drawing.activeIndex = firstUnsub;
-              loadActiveTask();
-            }
           }
         }
       });
@@ -590,7 +606,14 @@
       return;
     }
     if (phase === 'lobby') renderLobby();
-    else if (phase === 'writing') renderWriting();
+    else if (phase === 'writing') {
+      if (!state._writingRendered) {
+        state._writingRendered = true;
+        renderWriting();
+      } else {
+        updateWritingStatus();
+      }
+    }
     else if (phase === 'drawing') {
       if (!state.drawing.canvas) renderDrawing();
       else updateDrawingStatus();
@@ -600,12 +623,21 @@
   }
 
   socket.on('state', (pub) => {
+    const prevPhase = state.public?.phase;
     state.public = pub;
+    if (prevPhase !== pub.phase) {
+      // Reset per-phase render flags so the next phase initialises cleanly
+      state._writingRendered = false;
+    }
     render();
   });
   socket.on('private', (priv) => {
     state.private = priv;
-    if (state.public && state.public.phase === 'writing') renderWriting();
+    // In writing phase, only patch the status — never re-render the whole
+    // template, which would wipe whatever the player is typing.
+    if (state.public && state.public.phase === 'writing' && state._writingRendered) {
+      updateWritingStatus();
+    }
     if (state.public && state.public.phase === 'drawing' && state.drawing.canvas) {
       updateDrawingStatus();
     }

@@ -197,7 +197,7 @@ class RoomManager {
     if (typeof png !== 'string' || !png.startsWith('data:image/')) {
       return { error: 'Invalid image' };
     }
-    if (png.length > 900_000) return { error: 'Drawing too large' };
+    if (png.length > 1_800_000) return { error: 'Drawing too large' };
     if (!room.round.drawings[writerId]) room.round.drawings[writerId] = [];
     const existing = room.round.drawings[writerId].find(
       (d) => d.artistId === playerId

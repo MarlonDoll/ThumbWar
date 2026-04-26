@@ -354,7 +354,26 @@
     }
 
     toDataURL() {
-      return this.canvas.toDataURL('image/jpeg', 0.78);
+      // Downscale on export so the server cap (~1.5MB) is never breached even
+      // if the canvas is busy. The canvas itself stays at full 1280x720 for
+      // drawing precision.
+      const sizes = [
+        [960, 540, 0.75],
+        [800, 450, 0.7],
+        [640, 360, 0.6]
+      ];
+      for (const [w, h, q] of sizes) {
+        const out = document.createElement('canvas');
+        out.width = w;
+        out.height = h;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(this.canvas, 0, 0, w, h);
+        const data = out.toDataURL('image/jpeg', q);
+        if (data.length <= 1_400_000) return data;
+      }
+      return this.canvas.toDataURL('image/jpeg', 0.5);
     }
   }
 

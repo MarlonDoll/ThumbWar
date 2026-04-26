@@ -8,10 +8,10 @@ const { RoomManager, PHASES } = require('./src/rooms');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  maxHttpBufferSize: 2e6
+  maxHttpBufferSize: 4e6
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '4mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (_req, res) => {
