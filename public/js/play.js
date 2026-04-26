@@ -33,15 +33,17 @@
     const saved = JSON.parse(localStorage.getItem('thumbwar:session') || 'null');
     if (saved && saved.code === code && saved.playerId) {
       state.playerId = saved.playerId;
-      socket.on('connect', () => {
+      const doResume = () => {
         socket.emit('resume', { code, playerId: state.playerId }, (res) => {
-          if (res.error) {
+          if (res && res.error) {
             alert(res.error);
             localStorage.removeItem('thumbwar:session');
             window.location.href = '/';
           }
         });
-      });
+      };
+      if (socket.connected) doResume();
+      socket.on('connect', doResume);
     }
   } catch {}
 

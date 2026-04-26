@@ -73,6 +73,7 @@ io.on('connection', (socket) => {
     if (!p) return cb({ error: 'Player not found in this room' });
     p.socketId = socket.id;
     p.connected = true;
+    delete p.disconnectedAt;
     socket.join(room.code);
     socket.data.playerId = playerId;
     socket.data.roomCode = room.code;
@@ -176,23 +177,48 @@ io.on('connection', (socket) => {
     if (p) {
       p.connected = false;
       p.socketId = null;
+      p.disconnectedAt = Date.now();
     }
-    // In the lobby, drop disconnected players entirely.
-    if (room.phase === PHASES.LOBBY && p) {
-      rooms.remove(room, p.id);
-      if (room.players.length === 0) {
-        rooms.rooms.delete(room.code);
-        return;
-      }
-      // Reassign host if host left.
-      if (p.id === room.hostId && room.players.length > 0) {
-        room.hostId = room.players[0].id;
-        room.players[0].isHost = true;
-      }
-    }
+    // Don't immediately remove the player — page navigations (landing -> /play)
+    // disconnect briefly. The cleanup sweep will remove truly stale players.
     broadcastState(room);
   });
 });
+
+// Periodic cleanup: drop players who've been disconnected too long, promote a
+// new host if the host vanished, and delete empty rooms. Keeps in-memory state
+// from accumulating without yanking the rug on someone reloading their tab.
+const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minutes
+const EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;  // 10 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of [...rooms.rooms.entries()]) {
+    let hostGone = false;
+    const before = room.players.length;
+    room.players = room.players.filter((p) => {
+      if (p.connected) return true;
+      if (!p.disconnectedAt) return true;
+      const gone = now - p.disconnectedAt > DISCONNECT_GRACE_MS;
+      if (gone && p.id === room.hostId) hostGone = true;
+      return !gone;
+    });
+    if (hostGone && room.players.length > 0) {
+      room.hostId = room.players[0].id;
+      room.players[0].isHost = true;
+    }
+    if (room.players.length === 0) {
+      const allDisconnected = before === 0;
+      room.emptyAt = room.emptyAt || now;
+      if (allDisconnected || now - room.emptyAt > EMPTY_ROOM_TTL_MS) {
+        rooms.rooms.delete(code);
+      }
+    } else {
+      delete room.emptyAt;
+      io.to(room.code).emit('state', rooms.publicState(room));
+    }
+  }
+}, 30 * 1000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
