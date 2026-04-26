@@ -1,37 +1,113 @@
 const { PERSONAS } = require('./personas');
-const { FORMATS } = require('./formats');
 
-// Fillers used to fill in [X] and [Y] blanks in YouTube title formats.
-// Chosen to be funny/relatable across many formats.
-const X_FILLERS = [
-  'My Dog', 'My Mom', 'My Boss', 'A Stranger', 'My Therapist',
-  'A Toddler', 'A Goose', 'A Pizza', 'AI', 'Crypto',
-  'Costco', 'IKEA', 'Disneyland', 'My Dentist', 'My Ex',
-  'A Roomba', 'A Dragon', 'The DMV', 'TikTok', 'A Vampire',
-  'Money', 'Coffee', 'Cheese', 'Bubble Wrap', 'A Banana',
-  'My Wi-Fi', 'A Lawyer', 'A Time Traveler', 'My Landlord', 'Spaghetti'
-];
-
-const Y_FILLERS = [
-  '24 Hours', '7 Days', '30 Days', '$10,000', '$1',
-  'a Week', 'a Year', 'a Plane', 'an Island', 'My House',
-  '100 People', 'a Pirate Ship', 'a Volcano', 'Walmart', 'Antarctica',
-  'a Submarine', 'a Karen', 'a Cult', 'an Audit', 'a Roller Coaster'
+// Curated complete viral title ideas. These are guaranteed to make sense
+// as a real YouTube video so AFK fallbacks (or the 🎲 button) always
+// produce a coherent prompt. Combine each with a random persona.
+const COMPLETE_TITLES = [
+  'I Spent 24 Hours in IKEA',
+  'I Let My Mom Run My YouTube Channel',
+  'Last to Leave the Pool Wins $10,000',
+  'I Tried Every Costco Sample',
+  'I Survived 30 Days in a Cult',
+  'I Bought the World\'s Worst Car',
+  'I Recreated McDonald\'s at Home',
+  'I Gave a Stranger $1,000',
+  'I Lived in Walmart for a Week',
+  'I Trained My Dog to Beat Me at Chess',
+  'Don\'t Click This Video',
+  '100 Strangers Decide My Outfit',
+  'I Tested Every Viral TikTok Hack',
+  'I Tried Living Like a Billionaire for a Week',
+  'I Ate Only Beige Food for 7 Days',
+  'I Pretended to Be a Tourist in My Own City',
+  'I Quit My Job to Sell Pickles',
+  'Last to Stop Singing Wins a Tesla',
+  'I Spent the Night in a Haunted Hotel',
+  'I Asked AI to Plan My Entire Life',
+  'I Tried the World\'s Spiciest Noodles',
+  'I Replaced My Phone With a Flip Phone for a Month',
+  'I Taught My Grandma How to Speedrun Mario',
+  'I Built a Mansion Out of Cardboard',
+  'I Tried Every Single Item at Cheesecake Factory',
+  'Surprising My Sister With a $50,000 Wedding Dress',
+  'I Found the Worst-Reviewed Restaurant in My City',
+  'I Slept in a Walmart Overnight',
+  'I Tried Living Off Only Vending Machines',
+  'I Ranked Every Cereal So You Don\'t Have To',
+  'I Hired a Stranger to Plan My Day',
+  'I Switched Lives With My Boss for 24 Hours',
+  'I Let a Toddler Decorate My Apartment',
+  'I Bought a House on Facebook Marketplace',
+  'I Trained for the Olympics in 30 Days',
+  'I Spent $10,000 in 10 Minutes',
+  'I Tried Every Job in 24 Hours',
+  'I Ate a 50,000 Calorie Burger',
+  'Reading Mean Comments About My Cat',
+  'I Recreated Famous Memes in Real Life',
+  'Who Can Stay in the Pool Longest Wins $10,000',
+  'I Found My Old Diary and Reacted to It',
+  'I Lived Like a Medieval Knight for a Week',
+  'Cheap vs Expensive Sushi (Blind Taste Test)',
+  'I Tried the World\'s Most Dangerous Roller Coaster',
+  '$1 Pizza vs $10,000 Pizza',
+  'I Followed Tom Brady\'s Routine for 7 Days',
+  'I Sold My House for Bitcoin',
+  'I Tried to Become a TikTok Star Overnight',
+  'I Pranked My Wife With a Fake Lottery Ticket',
+  'I Hired a Maid to Clean My Disgusting Apartment',
+  'I Hosted the World\'s Saddest Birthday Party',
+  'I Built a Theme Park in My Backyard',
+  'I Asked Strangers to Draw My Portrait',
+  'I Survived 100 Hours in a Hot Tub',
+  'I Took My Dog on a 5-Star Vacation',
+  'I Replaced My Skin Care With Hot Sauce for a Week',
+  'I Said Yes to Everything for 24 Hours',
+  'I Slept on Strangers\' Couches for a Week',
+  'I Tried Every Therapy in One Day',
+  'Trying the World\'s Smallest McDonald\'s Order',
+  'I Lived in a Bouncy Castle for 72 Hours',
+  'I Let TikTok Pick My Outfit for a Month',
+  'I Spent My Whole Paycheck on Lottery Tickets',
+  'I Surprised My Dad With His Dream Car',
+  'I Tried to Survive a Day as a Toddler',
+  'I Got Fake Married for the Tax Benefits',
+  'Eating Only Foods My Toddler Picks for 24 Hours',
+  'I Gave My Therapist a Therapist',
+  'I Tried Every Drink at Starbucks',
+  'I Reviewed the Most Hated Movie of All Time',
+  'I Did My Taxes Live on Camera',
+  'I Trained My Cat to Cook Breakfast',
+  'I Tried to Beat the World Record for Longest Yawn',
+  'I Built a Working Roller Coaster in My Garage',
+  'I Replaced My Furniture With Bouncy Castles',
+  'I Tried to Become Internet Famous in 24 Hours',
+  'I Adopted 100 Goldfish for a Day',
+  'I Ate the World\'s Most Expensive Sandwich',
+  'I Hired a Lookalike to Live My Life for a Day',
+  'I Tried Living Off the Grid for 7 Days',
+  'I Sold My Childhood Toys to a Pawn Shop',
+  'I Asked Strangers to Pick My Tattoo',
+  'I Lived in a Self-Driving Car for 48 Hours',
+  'I Tried Cooking With Only Air Fryer for a Month',
+  'I Gave My Bedroom an HGTV-Style Makeover',
+  'I Pranked My Boss With a Fake Resignation',
+  'I Tracked Down My Childhood Bully',
+  'I Let an AI Decide What I Eat for a Week',
+  'I Tried Becoming a Dog Influencer',
+  'I Built the Cheapest Gaming Setup Possible',
+  'I Stayed Awake for 100 Hours and This Happened',
+  'I Spoke Only in Movie Quotes for 24 Hours'
 ];
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// Build a fully filled-in random title (no placeholders).
 function generateRandomTitle() {
-  const persona = pick(PERSONAS);
-  let title = pick(FORMATS);
-  // Replace any [X], [Y], [Z], [Location], etc with random fillers
-  title = title.replace(/\[X\]/g, () => pick(X_FILLERS));
-  title = title.replace(/\[Y\]/g, () => pick(Y_FILLERS));
-  title = title.replace(/\[[^\]]+\]/g, () => pick(X_FILLERS));
-  return { persona, title };
+  return {
+    persona: pick(PERSONAS),
+    title: pick(COMPLETE_TITLES)
+  };
 }
 
-module.exports = { generateRandomTitle };
+module.exports = { generateRandomTitle, COMPLETE_TITLES };
