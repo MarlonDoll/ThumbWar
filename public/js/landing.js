@@ -16,6 +16,18 @@
     }
   } catch {}
 
+  // Pre-fill room code if arriving from /play?code=XXXX or /?code=XXXX
+  const urlParams = new URLSearchParams(window.location.search);
+  const presetCode = (urlParams.get('code') || '').toUpperCase();
+  if (presetCode) {
+    joinForm.elements['code'].value = presetCode;
+    setTimeout(() => joinForm.elements['name'].focus(), 50);
+    // Highlight the join card so first-time visitors know what to do
+    document.querySelectorAll('.card').forEach((c) => c.classList.remove('highlight'));
+    const joinCard = joinForm.closest('.card');
+    if (joinCard) joinCard.classList.add('highlight');
+  }
+
   function showError(msg) {
     joinError.textContent = msg;
     joinError.hidden = false;

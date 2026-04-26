@@ -30,6 +30,28 @@
 
     <div id="toast" class="toast" hidden></div>
 
+    <div id="text-modal" class="modal" hidden>
+      <div class="modal-card">
+        <h2>Add text to thumbnail</h2>
+        <input id="text-modal-input" class="input-xl" maxlength="80" placeholder="YOUR THUMBNAIL TEXT" />
+        <div class="modal-row">
+          <label class="ctl">
+            Size
+            <input id="text-modal-size" type="range" min="20" max="160" value="64" />
+          </label>
+          <label class="ctl">
+            Color
+            <input id="text-modal-color" type="color" value="#ffd400" />
+          </label>
+        </div>
+        <div class="text-preview" id="text-modal-preview">YOUR THUMBNAIL TEXT</div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="text-modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="text-modal-confirm">Add Text</button>
+        </div>
+      </div>
+    </div>
+
     <template id="tpl-lobby">
       <section class="lobby panel">
         <h1>Waiting for players</h1>
@@ -81,17 +103,13 @@
 
     <template id="tpl-drawing">
       <section class="drawing panel">
-        <div class="prompt-card">
-          <div class="prompt-label">🎨 Draw a thumbnail for this video</div>
-          <div class="prompt-title" id="drawing-title">…</div>
-          <div class="prompt-meta">
-            <span class="prompt-persona" id="drawing-persona"></span>
-            <span class="task-pager">
-              <button class="btn btn-ghost btn-sm" id="prev-task">◀ prev</button>
-              <span id="task-label" class="pill">Title 1 / 1</span>
-              <button class="btn btn-ghost btn-sm" id="next-task">next ▶</button>
-            </span>
-          </div>
+        <div class="drawing-banner">
+          <span class="drawing-banner-label">🎨 You're drawing the thumbnail for:</span>
+          <span class="task-pager">
+            <button class="btn btn-ghost btn-sm" id="prev-task">◀</button>
+            <span id="task-label" class="pill">1 / 1</span>
+            <button class="btn btn-ghost btn-sm" id="next-task">▶</button>
+          </span>
         </div>
 
         <div class="toolbar" id="toolbar">
@@ -137,6 +155,20 @@
 
         <div class="canvas-shell">
           <canvas id="thumb" width="1280" height="720"></canvas>
+        </div>
+
+        <div class="yt-card">
+          <div class="yt-card-thumb-meta">
+            <div class="yt-channel-dot" id="drawing-dot">YT</div>
+            <div class="yt-text">
+              <div class="yt-title" id="drawing-title">…</div>
+              <div class="yt-meta">
+                <span class="yt-channel" id="drawing-persona"></span>
+                <span class="yt-dot">•</span>
+                <span class="yt-views">drawing now</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="drawing-footer">

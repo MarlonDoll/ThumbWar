@@ -48,8 +48,9 @@
   } catch {}
 
   if (!state.playerId) {
-    alert('No session — please re-join from the landing page.');
-    window.location.href = '/';
+    // First-time visitor or expired session — bounce back to landing with
+    // the code preserved so the join form pre-fills.
+    window.location.replace(`/?code=${encodeURIComponent(code)}`);
     return;
   }
 
@@ -60,6 +61,57 @@
   const timerPill = document.getElementById('timer-pill');
   const roomPill = document.getElementById('room-code-pill');
   roomPill.textContent = code;
+
+  // Text modal — wired to canvas.js via window.openTextModal
+  (function setupTextModal() {
+    const modal = document.getElementById('text-modal');
+    if (!modal) return;
+    const input = document.getElementById('text-modal-input');
+    const sizeIn = document.getElementById('text-modal-size');
+    const colorIn = document.getElementById('text-modal-color');
+    const preview = document.getElementById('text-modal-preview');
+    const cancel = document.getElementById('text-modal-cancel');
+    const confirm = document.getElementById('text-modal-confirm');
+    let pendingConfirm = null;
+
+    function refreshPreview() {
+      preview.textContent = input.value || 'YOUR THUMBNAIL TEXT';
+      preview.style.fontSize = sizeIn.value + 'px';
+      preview.style.color = colorIn.value;
+    }
+    input.addEventListener('input', refreshPreview);
+    sizeIn.addEventListener('input', refreshPreview);
+    colorIn.addEventListener('input', refreshPreview);
+
+    function close() {
+      modal.hidden = true;
+      pendingConfirm = null;
+    }
+    cancel.addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
+    confirm.addEventListener('click', () => {
+      const cb = pendingConfirm;
+      const payload = {
+        text: input.value.trim(),
+        size: parseInt(sizeIn.value, 10),
+        color: colorIn.value
+      };
+      close();
+      if (cb && payload.text) cb(payload);
+    });
+
+    window.openTextModal = ({ color, size, opacity, onConfirm }) => {
+      input.value = '';
+      sizeIn.value = size || 64;
+      colorIn.value = color || '#ffd400';
+      pendingConfirm = onConfirm;
+      modal.hidden = false;
+      refreshPreview();
+      setTimeout(() => input.focus(), 30);
+    };
+  })();
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -139,50 +191,10 @@
     renderTemplate('tpl-writing');
     const personaInput = document.getElementById('persona-input');
     const titleInput = document.getElementById('title-input');
-    const personaChips = document.getElementById('persona-suggestions');
-    const formatWrap = document.getElementById('format-suggestions');
     const submitBtn = document.getElementById('submit-title');
 
-    const priv = state.private || {};
-    const sugg = priv.suggestions || { personas: [], formats: [] };
-    if (!state.suggestionCache.personas) {
-      state.suggestionCache = sugg;
-    }
-    const cached = state.suggestionCache;
-
-    for (const p of cached.personas) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'chip';
-      b.textContent = p;
-      b.onclick = () => {
-        personaInput.value = p;
-        personaInput.focus();
-      };
-      personaChips.appendChild(b);
-    }
-
-    for (const f of cached.formats) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'format-btn';
-      b.textContent = f;
-      b.onclick = () => {
-        const personaVal = personaInput.value.trim();
-        let filled = f;
-        if (personaVal) {
-          filled = filled.replace('[X]', personaVal);
-        }
-        titleInput.value = filled;
-        titleInput.focus();
-      };
-      formatWrap.appendChild(b);
-    }
-
-    if (priv.myTitle) {
-      personaInput.value = priv.myTitle.persona || '';
-      titleInput.value = priv.myTitle.title || '';
-    }
+    populateSuggestions();
+    restoreMyTitle();
 
     submitBtn.onclick = () => {
       const title = titleInput.value.trim();
@@ -200,6 +212,59 @@
     updateWritingStatus();
   }
 
+  function populateSuggestions() {
+    const personaChips = document.getElementById('persona-suggestions');
+    const formatWrap = document.getElementById('format-suggestions');
+    if (!personaChips || !formatWrap) return;
+    const sugg = state.private?.suggestions;
+    if (!sugg || !sugg.personas?.length || !sugg.formats?.length) return;
+
+    if (personaChips.children.length === 0) {
+      const personaInput = document.getElementById('persona-input');
+      for (const p of sugg.personas) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = p;
+        b.onclick = () => {
+          personaInput.value = p;
+          personaInput.focus();
+        };
+        personaChips.appendChild(b);
+      }
+    }
+
+    if (formatWrap.children.length === 0) {
+      const personaInput = document.getElementById('persona-input');
+      const titleInput = document.getElementById('title-input');
+      for (const f of sugg.formats) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'format-btn';
+        b.textContent = f;
+        b.onclick = () => {
+          const personaVal = personaInput.value.trim();
+          let filled = f;
+          if (personaVal) filled = filled.replace('[X]', personaVal);
+          titleInput.value = filled;
+          titleInput.focus();
+        };
+        formatWrap.appendChild(b);
+      }
+    }
+  }
+
+  function restoreMyTitle() {
+    const priv = state.private || {};
+    const personaInput = document.getElementById('persona-input');
+    const titleInput = document.getElementById('title-input');
+    if (!personaInput || !titleInput) return;
+    if (priv.myTitle) {
+      if (!personaInput.value) personaInput.value = priv.myTitle.persona || '';
+      if (!titleInput.value) titleInput.value = priv.myTitle.title || '';
+    }
+  }
+
   function updateWritingStatus() {
     const statusEl = document.getElementById('writing-status');
     if (!statusEl) return;
@@ -210,31 +275,32 @@
     statusEl.textContent = `${mine}${submittedCount}/${total} players submitted`;
   }
 
+  function getTasks() {
+    return state.private?.tasks || [];
+  }
+
   function renderDrawing() {
     renderTemplate('tpl-drawing');
     const canvasEl = document.getElementById('thumb');
     const canvas = new ThumbCanvas(canvasEl);
     state.drawing.canvas = canvas;
 
-    const priv = state.private || {};
-    const tasks = priv.tasks || [];
-
-    // Clamp activeIndex
-    if (state.drawing.activeIndex >= tasks.length) state.drawing.activeIndex = 0;
+    if (state.drawing.activeIndex >= getTasks().length) state.drawing.activeIndex = 0;
 
     buildPalette(canvas);
     bindToolbar(canvas);
 
     document.getElementById('prev-task').onclick = () => switchTask(-1);
     document.getElementById('next-task').onclick = () => switchTask(1);
-
     document.getElementById('submit-drawing').onclick = submitCurrentDrawing;
 
+    state.drawing.refresh = loadActiveTask;
     loadActiveTask();
     updateDrawingStatus();
 
     function switchTask(delta) {
-      // Save current canvas to cache
+      const tasks = getTasks();
+      if (tasks.length === 0) return;
       if (tasks[state.drawing.activeIndex]) {
         const wid = tasks[state.drawing.activeIndex].writerId;
         state.drawing.cachedPngs[wid] = canvas.toDataURL();
@@ -244,21 +310,37 @@
     }
 
     function loadActiveTask() {
+      const tasks = getTasks();
       const t = tasks[state.drawing.activeIndex];
       const btn = document.getElementById('submit-drawing');
+      const titleEl = document.getElementById('drawing-title');
+      const personaEl = document.getElementById('drawing-persona');
+      const labelEl = document.getElementById('task-label');
       if (!t) {
-        document.getElementById('drawing-title').textContent = 'All done!';
-        document.getElementById('drawing-persona').textContent = '';
-        document.getElementById('task-label').textContent = '—';
+        if (titleEl) titleEl.textContent = tasks.length === 0 ? 'Loading your assignments…' : 'All done!';
+        if (personaEl) personaEl.textContent = '';
+        if (labelEl) labelEl.textContent = tasks.length === 0 ? '—' : `${state.drawing.activeIndex + 1} / ${tasks.length}`;
         if (btn) {
           btn.disabled = true;
-          btn.textContent = 'No more thumbnails';
+          btn.textContent = tasks.length === 0 ? 'Waiting…' : 'No more thumbnails';
         }
         return;
       }
-      document.getElementById('drawing-title').textContent = t.title.title;
-      document.getElementById('drawing-persona').textContent = `Persona: ${t.title.persona}`;
-      document.getElementById('task-label').textContent = `${state.drawing.activeIndex + 1} / ${tasks.length}`;
+      if (titleEl) titleEl.textContent = t.title.title;
+      if (personaEl) personaEl.textContent = t.title.persona;
+      if (labelEl) labelEl.textContent = `${state.drawing.activeIndex + 1} / ${tasks.length}`;
+      const dotEl = document.getElementById('drawing-dot');
+      if (dotEl) {
+        const initials = (t.title.persona || '?')
+          .replace(/^(a|an|the|your|my)\s+/i, '')
+          .split(/\s+/)
+          .map((w) => w[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join('')
+          .toUpperCase() || '?';
+        dotEl.textContent = initials;
+      }
       const cached = state.drawing.cachedPngs[t.writerId];
       canvas.loadPng(cached || null);
       if (btn) {
@@ -268,8 +350,9 @@
     }
 
     function submitCurrentDrawing() {
+      const tasks = getTasks();
       const t = tasks[state.drawing.activeIndex];
-      if (!t) return;
+      if (!t) return showToast('No active task — wait a moment and try again');
       const btn = document.getElementById('submit-drawing');
       btn.disabled = true;
       btn.textContent = 'Submitting…';
@@ -284,12 +367,13 @@
         }
         btn.textContent = '✓ Submitted — Resubmit?';
         showToast('Thumbnail submitted!');
-        const nextIdx = tasks.findIndex((x, i) => i > state.drawing.activeIndex && !x.submitted);
+        const next = getTasks();
+        const nextIdx = next.findIndex((x, i) => i > state.drawing.activeIndex && !x.submitted);
         if (nextIdx >= 0) {
           state.drawing.activeIndex = nextIdx;
           loadActiveTask();
         } else {
-          const firstUnsub = tasks.findIndex((x) => !x.submitted);
+          const firstUnsub = next.findIndex((x) => !x.submitted);
           if (firstUnsub >= 0 && firstUnsub !== state.drawing.activeIndex) {
             state.drawing.activeIndex = firstUnsub;
             loadActiveTask();
@@ -301,9 +385,9 @@
 
   function updateDrawingStatus() {
     const el = document.getElementById('drawing-status');
+    const tasks = getTasks();
+    if (state.drawing.refresh) state.drawing.refresh();
     if (!el) return;
-    const priv = state.private || {};
-    const tasks = priv.tasks || [];
     const done = tasks.filter((t) => t.submitted).length;
     el.textContent = `${done}/${tasks.length} thumbnails submitted`;
   }
@@ -633,9 +717,11 @@
   });
   socket.on('private', (priv) => {
     state.private = priv;
-    // In writing phase, only patch the status — never re-render the whole
-    // template, which would wipe whatever the player is typing.
+    // In writing phase, only patch — never re-render the whole template,
+    // which would wipe whatever the player is typing.
     if (state.public && state.public.phase === 'writing' && state._writingRendered) {
+      populateSuggestions();
+      restoreMyTitle();
       updateWritingStatus();
     }
     if (state.public && state.public.phase === 'drawing' && state.drawing.canvas) {

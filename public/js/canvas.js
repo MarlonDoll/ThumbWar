@@ -97,10 +97,29 @@
       }
 
       if (this.tool === 'text') {
-        const text = window.prompt('Enter text:');
-        if (text) {
-          this._drawText(x, y, text);
-          this._pushUndo();
+        const opener = window.openTextModal;
+        if (opener) {
+          opener({
+            color: this.color,
+            size: this.textSize,
+            opacity: this.opacity,
+            onConfirm: ({ text, size, color }) => {
+              if (!text) return;
+              const prev = { color: this.color, size: this.textSize };
+              this.color = color;
+              this.textSize = size;
+              this._drawText(x, y, text);
+              this._pushUndo();
+              this.color = prev.color;
+              this.textSize = prev.size;
+            }
+          });
+        } else {
+          const text = window.prompt('Enter text:');
+          if (text) {
+            this._drawText(x, y, text);
+            this._pushUndo();
+          }
         }
         return;
       }
@@ -195,22 +214,30 @@
 
     _drawArrow(x1, y1, x2, y2) {
       const ctx = this.ctx;
-      const headSize = Math.max(14, this.size * 3.5);
+      const headLen = Math.max(18, this.size * 4);
+      const headWidth = Math.max(10, this.size * 2.4);
       const angle = Math.atan2(y2 - y1, x2 - x1);
+      // End the shaft slightly inside the arrowhead base so a thick line
+      // with a round cap doesn't poke past the tip.
+      const baseX = x2 - headLen * 0.85 * Math.cos(angle);
+      const baseY = y2 - headLen * 0.85 * Math.sin(angle);
+      ctx.save();
+      ctx.lineCap = 'butt';
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      ctx.lineTo(baseX, baseY);
       ctx.stroke();
+      ctx.restore();
+      // Filled triangular head, perpendicular width controlled separately
+      const perp = angle + Math.PI / 2;
+      const wingX = headLen * Math.cos(angle);
+      const wingY = headLen * Math.sin(angle);
+      const sideX = headWidth * Math.cos(perp);
+      const sideY = headWidth * Math.sin(perp);
       ctx.beginPath();
       ctx.moveTo(x2, y2);
-      ctx.lineTo(
-        x2 - headSize * Math.cos(angle - Math.PI / 6),
-        y2 - headSize * Math.sin(angle - Math.PI / 6)
-      );
-      ctx.lineTo(
-        x2 - headSize * Math.cos(angle + Math.PI / 6),
-        y2 - headSize * Math.sin(angle + Math.PI / 6)
-      );
+      ctx.lineTo(x2 - wingX + sideX, y2 - wingY + sideY);
+      ctx.lineTo(x2 - wingX - sideX, y2 - wingY - sideY);
       ctx.closePath();
       ctx.fill();
     }
