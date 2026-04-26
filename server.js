@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const { RoomManager, PHASES } = require('./src/rooms');
+const { generateRandomTitle } = require('./src/randomTitle');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,6 +26,7 @@ app.get('/host', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/random-title', (_req, res) => res.json(generateRandomTitle()));
 
 const rooms = new RoomManager(io);
 

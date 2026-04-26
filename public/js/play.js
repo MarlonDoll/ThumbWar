@@ -196,6 +196,18 @@
     populateSuggestions();
     restoreMyTitle();
 
+    document.getElementById('random-title').onclick = async () => {
+      try {
+        const res = await fetch('/api/random-title');
+        const r = await res.json();
+        personaInput.value = r.persona;
+        titleInput.value = r.title;
+        titleInput.focus();
+      } catch (e) {
+        showToast('Could not load random title');
+      }
+    };
+
     submitBtn.onclick = () => {
       const title = titleInput.value.trim();
       if (!title) return showToast('Write a title first');
@@ -235,7 +247,6 @@
     }
 
     if (formatWrap.children.length === 0) {
-      const personaInput = document.getElementById('persona-input');
       const titleInput = document.getElementById('title-input');
       for (const f of sugg.formats) {
         const b = document.createElement('button');
@@ -243,11 +254,16 @@
         b.className = 'format-btn';
         b.textContent = f;
         b.onclick = () => {
-          const personaVal = personaInput.value.trim();
-          let filled = f;
-          if (personaVal) filled = filled.replace('[X]', personaVal);
-          titleInput.value = filled;
+          // Drop the format in as-is — let the player fill the [X] / [Y]
+          // blanks themselves. Auto-select the first blank so they can
+          // start typing to replace it immediately.
+          titleInput.value = f;
           titleInput.focus();
+          const idx = f.indexOf('[');
+          if (idx >= 0) {
+            const end = f.indexOf(']', idx);
+            if (end >= 0) titleInput.setSelectionRange(idx, end + 1);
+          }
         };
         formatWrap.appendChild(b);
       }

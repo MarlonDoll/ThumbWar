@@ -2,6 +2,7 @@ const { pickRandomPersonas } = require('./personas');
 const { pickRandomFormats } = require('./formats');
 const { buildAssignments, drawTasksByPlayer } = require('./pairings');
 const { zero, scoreMatchups, scoreAwards } = require('./scoring');
+const { generateRandomTitle } = require('./randomTitle');
 
 const PHASES = {
   LOBBY: 'lobby',
@@ -170,15 +171,16 @@ class RoomManager {
     if (room.phase !== PHASES.WRITING) return;
     this._clearTimer(room);
 
-    // Fill in blanks for any writer who didn't submit.
+    // Generate a random title for any writer who didn't submit.
     for (const id of room.round.writers) {
       if (!room.round.titles[id]) {
+        const random = generateRandomTitle();
         room.round.titles[id] = {
           id: uid('t'),
           writerId: id,
-          persona: 'A Ghost',
+          persona: random.persona,
           format: null,
-          title: '(this player was AFK)'
+          title: random.title
         };
       }
     }

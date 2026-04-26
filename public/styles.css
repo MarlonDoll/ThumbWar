@@ -448,6 +448,11 @@ textarea.input-xl {
   gap: 10px;
   flex-wrap: wrap;
 }
+.writing-buttons {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
 
 /* Drawing */
 .drawing-banner {
