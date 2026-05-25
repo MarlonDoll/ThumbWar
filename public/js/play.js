@@ -322,6 +322,7 @@
         state.drawing.cachedPngs[wid] = canvas.toDataURL();
       }
       state.drawing.activeIndex = (state.drawing.activeIndex + delta + tasks.length) % tasks.length;
+      state.drawing._loadedWriterId = null;
       loadActiveTask();
     }
 
@@ -357,8 +358,13 @@
           .toUpperCase() || '?';
         dotEl.textContent = initials;
       }
-      const cached = state.drawing.cachedPngs[t.writerId];
-      canvas.loadPng(cached || null);
+      // Only reload the canvas when switching to a different task.
+      // Reloading on every state update wipes whatever the player is drawing.
+      if (state.drawing._loadedWriterId !== t.writerId) {
+        state.drawing._loadedWriterId = t.writerId;
+        const cached = state.drawing.cachedPngs[t.writerId];
+        canvas.loadPng(cached || null);
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = t.submitted ? '✓ Submitted — Resubmit?' : 'Submit Thumbnail';
