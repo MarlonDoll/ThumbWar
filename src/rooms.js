@@ -328,7 +328,7 @@ class RoomManager {
       });
     }
     room.round.voteIndex += 1;
-    this.io.to(room.code).emit('state', this.publicState(room));
+    this._broadcastAll(room);
     if (room.round.voteIndex >= room.round.voting.length) {
       this._finishVoting(room);
     } else {
@@ -540,8 +540,17 @@ class RoomManager {
       } catch (e) {
         console.error('Timer callback error', e);
       }
-      this.io.to(room.code).emit('state', this.publicState(room));
+      this._broadcastAll(room);
     }, seconds * 1000);
+  }
+
+  _broadcastAll(room) {
+    this.io.to(room.code).emit('state', this.publicState(room));
+    for (const p of room.players) {
+      if (p.socketId) {
+        this.io.to(p.socketId).emit('private', this.privateView(room, p.id));
+      }
+    }
   }
 
   _clearTimer(room) {

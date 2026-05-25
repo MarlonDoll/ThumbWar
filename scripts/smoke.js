@@ -46,7 +46,7 @@ async function run() {
   p2.on('private', (pv) => (privs.p2 = pv));
   p3.on('private', (pv) => (privs.p3 = pv));
 
-  await wait(150);
+  await wait(400);
   console.log('players in lobby:', states.host.players.length);
 
   const start = await emitAsync(host, 'start-game', {});
