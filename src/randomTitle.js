@@ -103,10 +103,19 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// Track last generated title to avoid repeats
+let lastTitle = null;
+
 function generateRandomTitle() {
+  let title = pick(COMPLETE_TITLES);
+  // Re-roll up to 3 times if we get the same title as last time
+  for (let i = 0; i < 3 && title === lastTitle && COMPLETE_TITLES.length > 1; i++) {
+    title = pick(COMPLETE_TITLES);
+  }
+  lastTitle = title;
   return {
     persona: pick(PERSONAS),
-    title: pick(COMPLETE_TITLES)
+    title
   };
 }
 

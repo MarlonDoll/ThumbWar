@@ -612,6 +612,7 @@
     arena.classList.toggle('vs-3', m.thumbnails.length >= 3);
 
     const alreadyVoted = (m.votedBy || []).includes(state.playerId);
+    const hasResults = !!(m.results);
 
     m.thumbnails.forEach((t, i) => {
       if (i > 0) {
@@ -626,26 +627,43 @@
       const personaLine = t.persona
         ? `<div class="vs-persona">${escapeHtml(t.persona)}</div>`
         : '';
-      card.innerHTML = `
-        <div class="vs-letter">${label}</div>
-        <img src="${t.png}" alt="Thumbnail ${label}" />
-        ${personaLine}
-        <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
-      `;
-      card.querySelector('.vote-btn').onclick = () => {
-        if (alreadyVoted) return;
-        socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
-          if (res && res.error) showToast(res.error);
-          else {
-            showToast('Vote cast!');
-            card.classList.add('voted');
-          }
-        });
-      };
+
+      if (hasResults) {
+        const isWinner = m.results.winners.includes(t.id);
+        const voteCount = m.results.votes[t.id] || 0;
+        card.classList.toggle('winner', isWinner);
+        card.innerHTML = `
+          <div class="vs-letter">${label}</div>
+          <img src="${t.png}" alt="Thumbnail ${label}" />
+          ${personaLine}
+          <div class="vote-result ${isWinner ? 'vote-result-winner' : ''}">
+            ${isWinner ? '🏆 ' : ''}${voteCount} vote${voteCount !== 1 ? 's' : ''}
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div class="vs-letter">${label}</div>
+          <img src="${t.png}" alt="Thumbnail ${label}" />
+          ${personaLine}
+          <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
+        `;
+        card.querySelector('.vote-btn').onclick = () => {
+          if (alreadyVoted) return;
+          socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
+            if (res && res.error) showToast(res.error);
+            else {
+              showToast('Vote cast!');
+              card.classList.add('voted');
+            }
+          });
+        };
+      }
       arena.appendChild(card);
     });
 
-    if (m.thumbnails.length <= 1) {
+    if (hasResults) {
+      document.getElementById('vote-status').textContent = 'Results! Next matchup coming up…';
+    } else if (m.thumbnails.length <= 1) {
       document.getElementById('vote-status').textContent = 'Solo reveal — advancing…';
     } else if (alreadyVoted) {
       document.getElementById('vote-status').textContent = 'Waiting for others to vote…';

@@ -25,7 +25,7 @@
       this.height = canvas.height;
 
       this.tool = 'pen';
-      this.color = '#ff0000';
+      this.color = '#000000';
       this.size = 6;
       this.textSize = 48;
       this.opacity = 1;

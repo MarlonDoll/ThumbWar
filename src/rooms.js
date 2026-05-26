@@ -279,12 +279,14 @@ class RoomManager {
       this._finishVoting(room);
       return;
     }
+    // Clear any previous results on this matchup
+    delete m.results;
     // Solo mode: 1 thumbnail, no vote needed — flash the reveal briefly.
     if (m.thumbnails.length <= 1) {
       // Auto-advance after a short reveal delay.
       this._clearTimer(room);
-      room.timerEndsAt = Date.now() + 5000;
-      room.timerHandle = setTimeout(() => this._advanceMatchup(room), 5000);
+      room.timerEndsAt = Date.now() + 3000;
+      room.timerHandle = setTimeout(() => this._advanceMatchup(room), 3000);
       return;
     }
     this._startTimer(room, room.config.VOTE_SECONDS, () =>
@@ -334,6 +336,35 @@ class RoomManager {
       const winners = Object.keys(m.votes).filter(
         (id) => m.votes[id] === max && max > 0
       );
+
+      // If results haven't been shown yet, store them and broadcast for 4s
+      if (!m.results) {
+        m.results = { winners, votes: { ...m.votes } };
+        this._broadcastAll(room);
+        room.timerEndsAt = Date.now() + 4000;
+        room.timerHandle = setTimeout(() => {
+          room.timerHandle = null;
+          room.timerEndsAt = null;
+          // Now actually advance
+          room.round.matchupResults.push({
+            writerId: m.writerId,
+            title: m.title,
+            thumbnails: m.thumbnails,
+            votes: m.votes,
+            winners
+          });
+          room.round.voteIndex += 1;
+          this._broadcastAll(room);
+          if (room.round.voteIndex >= room.round.voting.length) {
+            this._finishVoting(room);
+          } else {
+            this._beginCurrentMatchup(room);
+          }
+        }, 4000);
+        return;
+      }
+
+      // Results already shown (shouldn't normally reach here, but handle gracefully)
       room.round.matchupResults.push({
         writerId: m.writerId,
         title: m.title,
@@ -632,7 +663,8 @@ class RoomManager {
                 png: t.png,
                 persona: t.persona || null
               })),
-              votedBy: [...m.votedBy]
+              votedBy: [...m.votedBy],
+              results: m.results || null
             }
           : null
       };
