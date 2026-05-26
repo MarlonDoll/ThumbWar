@@ -297,7 +297,7 @@
 
     if (formatWrap.children.length === 0) {
       const titleInput = document.getElementById('title-input');
-      for (const f of sugg.formats) {
+      for (const f of sugg.formats.slice(0, 4)) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'format-btn';
@@ -365,6 +365,7 @@
     const personaIn = document.getElementById('drawer-persona-input');
     if (drawerMode && personaRow) {
       personaRow.hidden = false;
+      if (!personaIn.value) personaIn.value = me()?.name || '';
       const chips = document.getElementById('drawer-persona-chips');
       const sugg = state.private?.personaSuggestions || [];
       if (chips && sugg.length && chips.children.length === 0) {
@@ -382,6 +383,38 @@
     state.drawing.refresh = loadActiveTask;
     loadActiveTask();
     updateDrawingStatus();
+
+    // Auto-submit all drawings when ~3 seconds remain
+    state.drawing._autoSubmitted = false;
+    state.drawing._autoSubmitInterval = setInterval(() => {
+      if (state.public?.phase !== 'drawing') {
+        clearInterval(state.drawing._autoSubmitInterval);
+        return;
+      }
+      if (state.drawing._autoSubmitted) return;
+      if (!state.public.timerEndsAt) return;
+      const remaining = state.public.timerEndsAt - Date.now();
+      if (remaining < 3500) {
+        state.drawing._autoSubmitted = true;
+        clearInterval(state.drawing._autoSubmitInterval);
+        const tasks = getTasks();
+        const cv = state.drawing.canvas;
+        for (let i = 0; i < tasks.length; i++) {
+          const t = tasks[i];
+          if (t.submitted) continue;
+          // Save current canvas to the task's slot if it's the active one
+          if (i === state.drawing.activeIndex && cv) {
+            state.drawing.cachedPngs[t.writerId] = cv.toDataURL();
+          }
+          const png = state.drawing.cachedPngs[t.writerId];
+          if (png) {
+            const drawPersona = document.getElementById('drawer-persona-input')?.value || '';
+            socket.emit('submit-drawing', { writerId: t.writerId, png, persona: drawPersona });
+          }
+        }
+        showToast('Auto-submitted drawings (time almost up)');
+      }
+    }, 1000);
 
     function switchTask(delta) {
       const tasks = getTasks();
@@ -402,6 +435,7 @@
       const titleEl = document.getElementById('drawing-title');
       const personaEl = document.getElementById('drawing-persona');
       const labelEl = document.getElementById('task-label');
+      const bannerTitle = document.getElementById('banner-title');
       if (!t) {
         if (titleEl) titleEl.textContent = tasks.length === 0 ? 'Loading your assignments…' : 'All done!';
         if (personaEl) personaEl.textContent = '';
@@ -413,6 +447,7 @@
         return;
       }
       if (titleEl) titleEl.textContent = t.title.title;
+      if (bannerTitle) bannerTitle.textContent = t.title.title;
       if (personaEl) personaEl.textContent = t.title.persona;
       if (labelEl) labelEl.textContent = `${state.drawing.activeIndex + 1} / ${tasks.length}`;
       const dotEl = document.getElementById('drawing-dot');

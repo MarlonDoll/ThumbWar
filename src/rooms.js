@@ -18,7 +18,8 @@ const DEFAULTS = {
   DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 60,
-  PERSONA_MODE: 'writer' // 'writer' | 'drawer'
+  PERSONA_MODE: 'writer', // 'writer' | 'drawer'
+  ROUNDS: 3
 };
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

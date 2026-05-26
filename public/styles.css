@@ -496,9 +496,6 @@ textarea.input-xl {
 .format-wrap {
   flex-direction: column;
   align-items: stretch;
-  max-height: 240px;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 .writing-actions {
   display: flex;
@@ -529,6 +526,12 @@ textarea.input-xl {
 .drawing-banner-label {
   font-size: 14px;
   letter-spacing: 0.04em;
+}
+.drawing-banner-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 2px;
+  color: white;
 }
 .drawing-banner .task-pager .pill {
   background: rgba(0, 0, 0, 0.3);

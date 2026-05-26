@@ -16,7 +16,7 @@
     <header class="topbar">
       <div class="brand small">
         <a href="/" class="brand-link">
-          <span class="brand-play">▶</span>
+          <span class="brand-play">👍</span>
           <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
         </a>
       </div>
@@ -68,7 +68,7 @@
               <input type="checkbox" id="spectator" /> Spectator mode
             </label>
             <div class="persona-mode-row" id="persona-mode-row">
-              <span class="muted small">Who picks the persona?</span>
+              <span class="muted small">Who picks the creator?</span>
               <button class="btn btn-sm" id="pm-writer">Writer</button>
               <button class="btn btn-sm" id="pm-drawer">Drawer</button>
             </div>
@@ -123,26 +123,26 @@
     <template id="tpl-writing">
       <section class="writing panel">
         <h1>Write a YouTube title</h1>
-        <p class="muted">Pick a persona, then write a title a video like that would have.</p>
+        <p class="muted">Pick a creator, then write a title a video like that would have.</p>
 
         <div class="write-grid">
           <div class="col">
-            <h3>Your persona</h3>
-            <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. Santa Claus, My Wife, A Cult Leader" />
+            <h3>Your creator</h3>
+            <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Cult Leader" />
             <p class="muted tiny">Or pick a suggestion:</p>
             <div id="persona-suggestions" class="chip-wrap"></div>
           </div>
 
           <div class="col">
-            <h3>Title format <span class="muted tiny">(optional)</span></h3>
+            <h3>Your title</h3>
+            <textarea id="title-input" class="input-xl" maxlength="120" placeholder="I Let Santa Run My Business for 24 Hours"></textarea>
+            <p class="muted tiny">Tip: replace the [X] / [Y] blanks with your own words.</p>
+
+            <h3>Need inspiration?</h3>
             <p class="muted tiny">Tap a format and the blanks become part of your title.</p>
             <div id="format-suggestions" class="format-wrap"></div>
           </div>
         </div>
-
-        <h3>Your title</h3>
-        <textarea id="title-input" class="input-xl" maxlength="120" placeholder="I Let Santa Run My Business for 24 Hours"></textarea>
-        <p class="muted tiny">Tip: replace the [X] / [Y] blanks with your own words.</p>
         <div class="writing-actions">
           <span id="writing-status" class="muted"></span>
           <span class="writing-buttons">
@@ -156,7 +156,10 @@
     <template id="tpl-drawing">
       <section class="drawing panel">
         <div class="drawing-banner">
-          <span class="drawing-banner-label">🎨 You're drawing the thumbnail for:</span>
+          <div>
+            <span class="drawing-banner-label">🎨 You're drawing the thumbnail for:</span>
+            <div class="drawing-banner-title" id="banner-title">...</div>
+          </div>
           <span class="task-pager">
             <button class="btn btn-ghost btn-sm" id="prev-task">◀</button>
             <span id="task-label" class="pill">1 / 1</span>
@@ -224,7 +227,7 @@
         </div>
 
         <div class="drawer-persona-row" id="drawer-persona-row" hidden>
-          <label class="drawer-persona-label">Pick a creator / persona for your thumbnail:</label>
+          <label class="drawer-persona-label">Pick a creator for your thumbnail:</label>
           <input id="drawer-persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Ninja" />
           <div id="drawer-persona-chips" class="chip-wrap"></div>
         </div>
