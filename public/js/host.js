@@ -121,11 +121,18 @@
       `Matchup ${v.index + 1} / ${v.total} · persona: ${m.title.persona} · Which video would you click?`;
     const row = document.getElementById('host-thumb-row');
     row.innerHTML = '';
+    row.classList.toggle('vs-3', m.thumbnails.length >= 3);
     m.thumbnails.forEach((t, i) => {
+      if (i > 0) {
+        const vs = document.createElement('div');
+        vs.className = 'host-vs-badge';
+        vs.textContent = 'VS';
+        row.appendChild(vs);
+      }
       const card = document.createElement('div');
       card.className = 'host-thumb';
       card.innerHTML = `
-        <div class="thumb-letter">${String.fromCharCode(65 + i)}</div>
+        <div class="vs-letter">${String.fromCharCode(65 + i)}</div>
         <img src="${t.png}" alt="Thumbnail ${i + 1}" />
       `;
       row.appendChild(card);
@@ -171,27 +178,20 @@
       });
 
     const awards = document.getElementById('host-awards');
-    const awardLabels = {
-      funniest: '😂 Funniest Concept',
-      clickbait: '🎣 Most Clickbait',
-      interesting: '🤔 Most Interesting'
-    };
-    for (const [cat, data] of Object.entries(r.awardResults || {})) {
-      const card = document.createElement('div');
-      card.className = 'award-card';
-      if (!data || !data.winners || data.winners.length === 0) {
-        card.innerHTML = `<h3>${awardLabels[cat] || cat}</h3><p class="muted">No votes</p>`;
-      } else {
-        const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
-        if (!concept) continue;
+    const bestData = r.awardResults?.best;
+    if (bestData && bestData.winners && bestData.winners.length > 0) {
+      const concept = (r.concepts || []).find((c) => c.id === bestData.winners[0]);
+      if (concept) {
+        const card = document.createElement('div');
+        card.className = 'award-card';
         card.innerHTML = `
-          <h3>${awardLabels[cat] || cat}</h3>
+          <h3>⭐ Best Concept</h3>
           ${concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
           <p class="award-title">${escapeHtml(concept.title.title)}</p>
           <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
         `;
+        awards.appendChild(card);
       }
-      awards.appendChild(card);
     }
   }
 

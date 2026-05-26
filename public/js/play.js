@@ -477,38 +477,40 @@
     const m = voting.matchup;
     document.getElementById('vote-title-row').textContent = m.title.title;
     document.getElementById('vote-progress').textContent =
-      `Matchup ${voting.index + 1} of ${voting.total} · persona: ${m.title.persona}`;
+      `Matchup ${voting.index + 1} of ${voting.total} · ${m.title.persona}`;
 
-    const grid = document.getElementById('thumb-choices');
-    grid.innerHTML = '';
-
-    // Was I an artist in this matchup?
-    const iAmArtist = !!(state.public.players.find(
-      (p) => p.id === state.playerId && !p.spectator
-    )) && false; // we don't know artistId on public payload — server enforces
+    const arena = document.getElementById('thumb-choices');
+    arena.innerHTML = '';
+    arena.classList.toggle('vs-3', m.thumbnails.length >= 3);
 
     const alreadyVoted = (m.votedBy || []).includes(state.playerId);
 
     m.thumbnails.forEach((t, i) => {
+      if (i > 0) {
+        const vs = document.createElement('div');
+        vs.className = 'vs-badge';
+        vs.textContent = 'VS';
+        arena.appendChild(vs);
+      }
       const card = document.createElement('div');
-      card.className = 'thumb-card';
+      card.className = 'vs-card';
       const label = String.fromCharCode(65 + i);
       card.innerHTML = `
-        <div class="thumb-letter">${label}</div>
+        <div class="vs-letter">${label}</div>
         <img src="${t.png}" alt="Thumbnail ${label}" />
-        <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>Click this</button>
+        <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
       `;
       card.querySelector('.vote-btn').onclick = () => {
         if (alreadyVoted) return;
         socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
           if (res && res.error) showToast(res.error);
           else {
-            showToast('Vote cast');
+            showToast('Vote cast!');
             card.classList.add('voted');
           }
         });
       };
-      grid.appendChild(card);
+      arena.appendChild(card);
     });
 
     if (m.thumbnails.length <= 1) {
@@ -522,20 +524,10 @@
 
   function renderBrowse() {
     renderTemplate('tpl-browse');
-    const tabs = document.querySelectorAll('#browse-tabs .tab');
-    tabs.forEach((tab) => {
-      tab.classList.toggle('active', tab.dataset.cat === state.browse.activeCat);
-      tab.onclick = () => {
-        state.browse.activeCat = tab.dataset.cat;
-        renderBrowse();
-      };
-    });
-
     const grid = document.getElementById('browse-grid');
     grid.innerHTML = '';
     const concepts = (state.public.browse && state.public.browse.concepts) || [];
-    const category = state.browse.activeCat;
-    const votedBy = state.public.browse.votedBy[category] || [];
+    const votedBy = state.public.browse.votedBy || [];
     const alreadyVoted = votedBy.includes(state.playerId);
 
     concepts.forEach((c) => {
@@ -548,10 +540,10 @@
       card.onclick = () => {
         socket.emit(
           'submit-browse-vote',
-          { category, conceptId: c.id },
+          { category: 'best', conceptId: c.id },
           (res) => {
             if (res && res.error) return showToast(res.error);
-            showToast(`Voted for ${category}`);
+            showToast('Voted!');
           }
         );
       };
@@ -559,8 +551,8 @@
     });
 
     document.getElementById('browse-status').textContent = alreadyVoted
-      ? `You've voted in ${category}. Tap a different one to change your pick.`
-      : `Pick the concept that feels most ${category} to you.`;
+      ? 'You\'ve voted. Tap a different one to change your pick.'
+      : 'Tap the concept you think is the best overall.';
   }
 
   function renderResults() {
@@ -596,30 +588,20 @@
 
     const awards = document.getElementById('awards');
     awards.innerHTML = '';
-    const awardLabels = {
-      funniest: '😂 Funniest Concept',
-      clickbait: '🎣 Most Clickbait',
-      interesting: '🤔 Most Interesting'
-    };
-    for (const [cat, data] of Object.entries(r.awardResults || {})) {
-      const card = document.createElement('div');
-      card.className = 'award-card';
-      if (!data || !data.winners || data.winners.length === 0) {
-        card.innerHTML = `<h3>${awardLabels[cat] || cat}</h3><p class="muted">No votes cast</p>`;
-      } else {
-        const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
-        if (!concept) {
-          card.innerHTML = `<h3>${awardLabels[cat] || cat}</h3><p class="muted">(no concept)</p>`;
-        } else {
-          card.innerHTML = `
-            <h3>${awardLabels[cat] || cat}</h3>
-            ${concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
-            <p class="award-title">${escapeHtml(concept.title.title)}</p>
-            <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
-          `;
-        }
+    const bestData = r.awardResults?.best;
+    if (bestData && bestData.winners && bestData.winners.length > 0) {
+      const concept = (r.concepts || []).find((c) => c.id === bestData.winners[0]);
+      if (concept) {
+        const card = document.createElement('div');
+        card.className = 'award-card';
+        card.innerHTML = `
+          <h3>⭐ Best Concept</h3>
+          ${concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
+          <p class="award-title">${escapeHtml(concept.title.title)}</p>
+          <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
+        `;
+        awards.appendChild(card);
       }
-      awards.appendChild(card);
     }
 
     // Fun stat awards

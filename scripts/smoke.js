@@ -101,16 +101,14 @@ async function run() {
   }
   console.log('phase after voting:', states.host.phase);
 
-  // Browse vote
+  // Browse vote — single "best" category
   if (states.host.phase === 'browse') {
     const concepts = states.host.browse.concepts;
-    for (const cat of ['funniest', 'clickbait', 'interesting']) {
-      for (const [, sock] of [['host', host], ['p2', p2], ['p3', p3]]) {
-        await emitAsync(sock, 'submit-browse-vote', {
-          category: cat,
-          conceptId: concepts[Math.floor(Math.random() * concepts.length)].id
-        });
-      }
+    for (const [, sock] of [['host', host], ['p2', p2], ['p3', p3]]) {
+      await emitAsync(sock, 'submit-browse-vote', {
+        category: 'best',
+        conceptId: concepts[Math.floor(Math.random() * concepts.length)].id
+      });
     }
   }
 

@@ -356,16 +356,8 @@ class RoomManager {
 
     room.browse = {
       concepts,
-      votes: {
-        funniest: {},
-        clickbait: {},
-        interesting: {}
-      },
-      votedBy: {
-        funniest: new Set(),
-        clickbait: new Set(),
-        interesting: new Set()
-      }
+      votes: { best: {} },
+      votedBy: { best: new Set() }
     };
     room.phase = PHASES.BROWSE;
     this._startTimer(room, room.config.BROWSE_SECONDS, () => this._finishBrowse(room));
@@ -375,7 +367,6 @@ class RoomManager {
     if (room.phase !== PHASES.BROWSE) return { error: 'Not in browse phase' };
     if (!room.browse.votes[category]) return { error: 'Unknown category' };
     if (room.browse.votedBy[category].has(playerId)) {
-      // Allow changing the vote
       const prev = room.browse.votedByChoice?.[category]?.[playerId];
       if (prev) {
         room.browse.votes[category][prev] = Math.max(0, (room.browse.votes[category][prev] || 0) - 1);
@@ -386,18 +377,11 @@ class RoomManager {
     room.browse.votes[category][conceptId] =
       (room.browse.votes[category][conceptId] || 0) + 1;
     room.browse.votedBy[category].add(playerId);
-    room.browse.votedByChoice = room.browse.votedByChoice || {
-      funniest: {},
-      clickbait: {},
-      interesting: {}
-    };
+    room.browse.votedByChoice = room.browse.votedByChoice || { best: {} };
     room.browse.votedByChoice[category][playerId] = conceptId;
 
-    // Auto-advance once every active player has voted in all 3 categories.
     const active = room.players.filter((p) => !p.spectator);
-    const allDone = ['funniest', 'clickbait', 'interesting'].every((cat) =>
-      active.every((p) => room.browse.votedBy[cat].has(p.id))
-    );
+    const allDone = active.every((p) => room.browse.votedBy.best.has(p.id));
     if (allDone) this._finishBrowse(room);
     return { ok: true };
   }
@@ -622,11 +606,7 @@ class RoomManager {
           title: c.title,
           thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null
         })),
-        votedBy: {
-          funniest: [...room.browse.votedBy.funniest],
-          clickbait: [...room.browse.votedBy.clickbait],
-          interesting: [...room.browse.votedBy.interesting]
-        }
+        votedBy: [...room.browse.votedBy.best]
       };
     }
     if (room.phase === PHASES.RESULTS) {
