@@ -49,6 +49,10 @@ async function run() {
   await wait(400);
   console.log('players in lobby:', states.host.players.length);
 
+  // Set rounds to 1 for a quick smoke test
+  await emitAsync(host, 'set-rounds', { rounds: 1 });
+  await wait(100);
+
   const start = await emitAsync(host, 'start-game', {});
   console.log('start-game:', start);
   await wait(150);

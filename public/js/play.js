@@ -196,6 +196,7 @@
       setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
       setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 60);
+      setVal('cfg-rounds', cfg.ROUNDS || 3);
 
       const sendTimers = () => {
         socket.emit('set-timers', {
@@ -208,6 +209,9 @@
       ['cfg-write', 'cfg-draw', 'cfg-vote', 'cfg-browse'].forEach((id) => {
         document.getElementById(id).onchange = sendTimers;
       });
+      document.getElementById('cfg-rounds').onchange = () => {
+        socket.emit('set-rounds', { rounds: document.getElementById('cfg-rounds').value });
+      };
     } else {
       timerSettings.hidden = true;
     }
@@ -383,6 +387,22 @@
     state.drawing.refresh = loadActiveTask;
     loadActiveTask();
     updateDrawingStatus();
+
+    // Robustness: if tasks haven't arrived yet, poll until they do
+    if (getTasks().length === 0) {
+      state.drawing._pollInterval = setInterval(() => {
+        if (state.public?.phase !== 'drawing') {
+          clearInterval(state.drawing._pollInterval);
+          state.drawing._pollInterval = null;
+          return;
+        }
+        if (getTasks().length > 0) {
+          clearInterval(state.drawing._pollInterval);
+          state.drawing._pollInterval = null;
+          loadActiveTask();
+        }
+      }, 500);
+    }
 
     // Auto-submit all drawings when ~3 seconds remain
     state.drawing._autoSubmitted = false;
@@ -766,7 +786,11 @@
     }
     const remaining = Math.max(0, Math.round((state.public.timerEndsAt - Date.now()) / 1000));
     timerPill.hidden = false;
-    timerPill.textContent = formatTime(remaining);
+    const totalRounds = state.public.totalRounds || 1;
+    const roundPrefix = totalRounds > 1
+      ? `R${(state.public.currentRound || 0) + 1}/${totalRounds} `
+      : '';
+    timerPill.textContent = roundPrefix + formatTime(remaining);
     timerPill.classList.toggle('urgent', remaining <= 10);
   }
 
@@ -790,6 +814,8 @@
       state._lastPhase = phase;
       if (phase === 'writing') state.suggestionCache = { personas: null, formats: null };
       if (phase === 'drawing') {
+        if (state.drawing._pollInterval) clearInterval(state.drawing._pollInterval);
+        if (state.drawing._autoSubmitInterval) clearInterval(state.drawing._autoSubmitInterval);
         state.drawing = { activeIndex: 0, canvas: null, cachedPngs: {} };
       }
       if (phase === 'voting') state._lastMatchupIndex = null;

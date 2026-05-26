@@ -131,6 +131,17 @@ io.on('connection', (socket) => {
     broadcastState(room);
   });
 
+  socket.on('set-rounds', ({ rounds }, cb) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return cb && cb({ error: 'No room' });
+    if (room.hostId !== socket.data.playerId) return cb && cb({ error: 'Host only' });
+    if (room.phase !== 'lobby') return cb && cb({ error: 'Only in lobby' });
+    const clamped = Math.max(1, Math.min(5, parseInt(rounds, 10) || 3));
+    room.config.ROUNDS = clamped;
+    cb && cb({ ok: true });
+    broadcastState(room);
+  });
+
   socket.on('start-game', (_data, cb) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return cb && cb({ error: 'No room' });

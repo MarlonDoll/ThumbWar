@@ -60,6 +60,7 @@ class RoomManager {
       timerEndsAt: null,
       timerHandle: null,
       round: null,
+      currentRound: 0,
       browse: null,
       scores: {},
       awardResults: null
@@ -120,6 +121,14 @@ class RoomManager {
     const active = room.players.filter((p) => !p.spectator);
     if (active.length < 1) return { error: 'Need at least 1 player' };
 
+    room.currentRound = 0;
+    room.scores = {};
+    this._startRound(room);
+    return { ok: true };
+  }
+
+  _startRound(room) {
+    const active = room.players.filter((p) => !p.spectator);
     room.phase = PHASES.WRITING;
     room.round = {
       writers: active.map((p) => p.id),
@@ -132,7 +141,6 @@ class RoomManager {
       matchupResults: []
     };
     this._startTimer(room, room.config.WRITE_SECONDS, () => this._finishWriting(room));
-    return { ok: true };
   }
 
   _buildSuggestions(players) {
@@ -345,7 +353,29 @@ class RoomManager {
 
   _finishVoting(room) {
     this._clearTimer(room);
-    // Build browse page: each concept = title + winning thumbnail (or first if tie)
+
+    // Score this round's matchups, accumulating into room.scores
+    const scores = room.scores;
+    // Ensure all players have an entry
+    for (const p of room.players) {
+      if (!(p.id in scores)) scores[p.id] = 0;
+    }
+    const tallies = room.round.matchupResults.map((r) => ({
+      writerId: r.writerId,
+      votes: r.votes,
+      thumbnails: r.thumbnails
+    }));
+    scoreMatchups(tallies, scores);
+
+    // Check if there are more rounds to play
+    if (room.currentRound < room.config.ROUNDS - 1) {
+      room.currentRound += 1;
+      this._startRound(room);
+      this._broadcastAll(room);
+      return;
+    }
+
+    // Last round — build browse page: each concept = title + winning thumbnail (or first if tie)
     const concepts = room.round.matchupResults.map((r) => {
       let winnerId = r.winners[0];
       if (!winnerId && r.thumbnails.length > 0) winnerId = r.thumbnails[0].id;
@@ -395,14 +425,8 @@ class RoomManager {
 
   _finishBrowse(room) {
     this._clearTimer(room);
-    // Score matchups
-    const scores = zero(room.players);
-    const tallies = room.round.matchupResults.map((r) => ({
-      writerId: r.writerId,
-      votes: r.votes,
-      thumbnails: r.thumbnails
-    }));
-    scoreMatchups(tallies, scores);
+    // Scores were already accumulated across rounds in _finishVoting
+    const scores = room.scores;
 
     // Score awards
     const awardResults = scoreAwards(
@@ -512,6 +536,7 @@ class RoomManager {
   restart(room) {
     room.phase = PHASES.LOBBY;
     room.round = null;
+    room.currentRound = 0;
     room.browse = null;
     room.scores = {};
     room.awardResults = null;
@@ -565,7 +590,9 @@ class RoomManager {
         spectator: p.spectator
       })),
       timerEndsAt: room.timerEndsAt,
-      config: room.config
+      config: room.config,
+      currentRound: room.currentRound || 0,
+      totalRounds: room.config.ROUNDS || 1
     };
     if (room.phase === PHASES.WRITING) {
       base.writing = {
