@@ -184,6 +184,34 @@
       pmRow.hidden = true;
     }
 
+    // Timer settings (host only)
+    const timerSettings = document.getElementById('timer-settings');
+    if (isHost()) {
+      const cfg = state.public.config || {};
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = String(val);
+      };
+      setVal('cfg-write', cfg.WRITE_SECONDS || 90);
+      setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
+      setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
+      setVal('cfg-browse', cfg.BROWSE_SECONDS || 60);
+
+      const sendTimers = () => {
+        socket.emit('set-timers', {
+          write: document.getElementById('cfg-write').value,
+          draw: document.getElementById('cfg-draw').value,
+          vote: document.getElementById('cfg-vote').value,
+          browse: document.getElementById('cfg-browse').value
+        });
+      };
+      ['cfg-write', 'cfg-draw', 'cfg-vote', 'cfg-browse'].forEach((id) => {
+        document.getElementById(id).onchange = sendTimers;
+      });
+    } else {
+      timerSettings.hidden = true;
+    }
+
     const startBtn = document.getElementById('start-btn');
     const hostHint = document.getElementById('host-hint');
     const activeCount = state.public.players.filter((p) => !p.spectator).length;

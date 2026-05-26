@@ -117,6 +117,20 @@ io.on('connection', (socket) => {
     broadcastState(room);
   });
 
+  socket.on('set-timers', (cfg, cb) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room) return cb && cb({ error: 'No room' });
+    if (room.hostId !== socket.data.playerId) return cb && cb({ error: 'Host only' });
+    if (room.phase !== 'lobby') return cb && cb({ error: 'Only in lobby' });
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, parseInt(v, 10) || lo));
+    if (cfg.write) room.config.WRITE_SECONDS = clamp(cfg.write, 30, 300);
+    if (cfg.draw) room.config.DRAW_SECONDS = clamp(cfg.draw, 60, 600);
+    if (cfg.vote) room.config.VOTE_SECONDS = clamp(cfg.vote, 10, 120);
+    if (cfg.browse) room.config.BROWSE_SECONDS = clamp(cfg.browse, 15, 180);
+    cb && cb({ ok: true });
+    broadcastState(room);
+  });
+
   socket.on('start-game', (_data, cb) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return cb && cb({ error: 'No room' });

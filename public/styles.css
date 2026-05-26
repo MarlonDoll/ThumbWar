@@ -373,6 +373,36 @@ button {
   gap: 8px;
   flex-wrap: wrap;
 }
+.timer-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.timer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.timer-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.timer-ctl select {
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.timer-ctl select:focus {
+  border-color: var(--yt-red);
+}
+
 .drawer-persona-row {
   margin-top: 10px;
   padding: 14px;

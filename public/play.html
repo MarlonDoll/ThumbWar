@@ -72,6 +72,47 @@
               <button class="btn btn-sm" id="pm-writer">Writer</button>
               <button class="btn btn-sm" id="pm-drawer">Drawer</button>
             </div>
+            <div class="timer-settings" id="timer-settings">
+              <span class="muted small">Round timers</span>
+              <div class="timer-grid">
+                <label class="timer-ctl">
+                  ✍️ Writing
+                  <select id="cfg-write">
+                    <option value="60">1 min</option>
+                    <option value="90" selected>1.5 min</option>
+                    <option value="120">2 min</option>
+                    <option value="180">3 min</option>
+                  </select>
+                </label>
+                <label class="timer-ctl">
+                  🎨 Drawing
+                  <select id="cfg-draw">
+                    <option value="120">2 min</option>
+                    <option value="180" selected>3 min</option>
+                    <option value="240">4 min</option>
+                    <option value="300">5 min</option>
+                  </select>
+                </label>
+                <label class="timer-ctl">
+                  🗳️ Voting
+                  <select id="cfg-vote">
+                    <option value="15">15 sec</option>
+                    <option value="25" selected>25 sec</option>
+                    <option value="40">40 sec</option>
+                    <option value="60">1 min</option>
+                  </select>
+                </label>
+                <label class="timer-ctl">
+                  📺 Browse
+                  <select id="cfg-browse">
+                    <option value="30">30 sec</option>
+                    <option value="60" selected>1 min</option>
+                    <option value="90">1.5 min</option>
+                    <option value="120">2 min</option>
+                  </select>
+                </label>
+              </div>
+            </div>
           </div>
           <button class="btn btn-primary btn-lg" id="start-btn">Start Game</button>
         </div>
