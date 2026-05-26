@@ -61,6 +61,7 @@ class RoomManager {
       timerHandle: null,
       round: null,
       currentRound: 0,
+      allMatchupResults: [],
       browse: null,
       scores: {},
       awardResults: null
@@ -79,8 +80,8 @@ class RoomManager {
     if (room.phase !== PHASES.LOBBY) {
       return { error: 'Game already in progress' };
     }
-    if (room.players.length >= 12) {
-      return { error: 'Room is full (max 12)' };
+    if (room.players.length >= 30) {
+      return { error: 'Room is full (max 30)' };
     }
     const trimmed = (name || '').trim().slice(0, 20) || 'Player';
     if (room.players.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) {
@@ -123,6 +124,7 @@ class RoomManager {
 
     room.currentRound = 0;
     room.scores = {};
+    room.allMatchupResults = [];
     this._startRound(room);
     return { ok: true };
   }
@@ -398,6 +400,9 @@ class RoomManager {
     }));
     scoreMatchups(tallies, scores);
 
+    // Accumulate this round's matchup results for cross-round stats
+    room.allMatchupResults.push(...room.round.matchupResults);
+
     // Check if there are more rounds to play
     if (room.currentRound < room.config.ROUNDS - 1) {
       room.currentRound += 1;
@@ -498,7 +503,7 @@ class RoomManager {
         unanimousTitles: 0
       };
     }
-    for (const r of room.round.matchupResults) {
+    for (const r of room.allMatchupResults) {
       let max = -1;
       for (const id of Object.keys(r.votes)) {
         if (r.votes[id] > max) max = r.votes[id];
@@ -570,6 +575,7 @@ class RoomManager {
     room.currentRound = 0;
     room.browse = null;
     room.scores = {};
+    room.allMatchupResults = [];
     room.awardResults = null;
     this._clearTimer(room);
   }
