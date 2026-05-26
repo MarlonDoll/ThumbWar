@@ -63,9 +63,16 @@
         </p>
         <div class="player-grid" id="lobby-players"></div>
         <div class="lobby-actions">
-          <label class="spectator-toggle">
-            <input type="checkbox" id="spectator" /> Spectator mode (don't play, just watch)
-          </label>
+          <div class="lobby-options">
+            <label class="spectator-toggle">
+              <input type="checkbox" id="spectator" /> Spectator mode
+            </label>
+            <div class="persona-mode-row" id="persona-mode-row">
+              <span class="muted small">Who picks the persona?</span>
+              <button class="btn btn-sm" id="pm-writer">Writer</button>
+              <button class="btn btn-sm" id="pm-drawer">Drawer</button>
+            </div>
+          </div>
           <button class="btn btn-primary btn-lg" id="start-btn">Start Game</button>
         </div>
         <p class="muted small" id="host-hint"></p>
@@ -173,6 +180,12 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="drawer-persona-row" id="drawer-persona-row" hidden>
+          <label class="drawer-persona-label">Pick a creator / persona for your thumbnail:</label>
+          <input id="drawer-persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Ninja" />
+          <div id="drawer-persona-chips" class="chip-wrap"></div>
         </div>
 
         <div class="drawing-footer">

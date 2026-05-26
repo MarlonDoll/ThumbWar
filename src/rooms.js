@@ -17,7 +17,8 @@ const DEFAULTS = {
   WRITE_SECONDS: 90,
   DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
-  BROWSE_SECONDS: 60
+  BROWSE_SECONDS: 60,
+  PERSONA_MODE: 'writer' // 'writer' | 'drawer'
 };
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -192,7 +193,7 @@ class RoomManager {
     this._startTimer(room, room.config.DRAW_SECONDS, () => this._finishDrawing(room));
   }
 
-  submitDrawing(room, playerId, writerId, png) {
+  submitDrawing(room, playerId, writerId, png, persona) {
     if (room.phase !== PHASES.DRAWING) return { error: 'Not in drawing phase' };
     const tasks = (room.round.drawTasks || {})[playerId] || [];
     if (!tasks.includes(writerId)) return { error: 'Not assigned to this title' };
@@ -201,17 +202,22 @@ class RoomManager {
     }
     if (png.length > 1_800_000) return { error: 'Drawing too large' };
     if (!room.round.drawings[writerId]) room.round.drawings[writerId] = [];
+    const drawPersona = room.config.PERSONA_MODE === 'drawer'
+      ? (persona || '').trim().slice(0, 60) || null
+      : null;
     const existing = room.round.drawings[writerId].find(
       (d) => d.artistId === playerId
     );
     if (existing) {
       existing.png = png;
+      if (drawPersona) existing.persona = drawPersona;
     } else {
       room.round.drawings[writerId].push({
         id: uid('d'),
         writerId,
         artistId: playerId,
-        png
+        png,
+        persona: drawPersona
       });
     }
     if (this._allDrawingsSubmitted(room)) {
@@ -593,7 +599,11 @@ class RoomManager {
           ? {
               writerId: m.writerId,
               title: m.title,
-              thumbnails: m.thumbnails.map((t) => ({ id: t.id, png: t.png })),
+              thumbnails: m.thumbnails.map((t) => ({
+                id: t.id,
+                png: t.png,
+                persona: t.persona || null
+              })),
               votedBy: [...m.votedBy]
             }
           : null
@@ -650,9 +660,13 @@ class RoomManager {
         return {
           writerId: wid,
           title: room.round.titles[wid],
-          submitted: !!existing
+          submitted: !!existing,
+          myPersona: existing?.persona || null
         };
       });
+      if (room.config.PERSONA_MODE === 'drawer') {
+        view.personaSuggestions = pickRandomPersonas(5);
+      }
     }
     return view;
   }

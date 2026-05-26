@@ -170,6 +170,20 @@
     specBox.checked = !!(m && m.spectator);
     specBox.onchange = () => socket.emit('set-spectator', { spectator: specBox.checked });
 
+    // Persona mode toggle (host only)
+    const pmRow = document.getElementById('persona-mode-row');
+    const pmWriter = document.getElementById('pm-writer');
+    const pmDrawer = document.getElementById('pm-drawer');
+    const currentPM = state.public.config?.PERSONA_MODE || 'writer';
+    pmWriter.classList.toggle('btn-primary', currentPM === 'writer');
+    pmDrawer.classList.toggle('btn-primary', currentPM === 'drawer');
+    if (isHost()) {
+      pmWriter.onclick = () => socket.emit('set-persona-mode', { mode: 'writer' });
+      pmDrawer.onclick = () => socket.emit('set-persona-mode', { mode: 'drawer' });
+    } else {
+      pmRow.hidden = true;
+    }
+
     const startBtn = document.getElementById('start-btn');
     const hostHint = document.getElementById('host-hint');
     const activeCount = state.public.players.filter((p) => !p.spectator).length;
@@ -193,6 +207,13 @@
     const titleInput = document.getElementById('title-input');
     const submitBtn = document.getElementById('submit-title');
 
+    // In drawer mode, hide the persona section — drawers pick persona later
+    const drawerMode = state.public.config?.PERSONA_MODE === 'drawer';
+    if (drawerMode) {
+      const personaCol = personaInput.closest('.col');
+      if (personaCol) personaCol.hidden = true;
+    }
+
     populateSuggestions();
     restoreMyTitle();
 
@@ -200,7 +221,7 @@
       try {
         const res = await fetch('/api/random-title');
         const r = await res.json();
-        personaInput.value = r.persona;
+        if (!drawerMode) personaInput.value = r.persona;
         titleInput.value = r.title;
         titleInput.focus();
       } catch (e) {
@@ -310,6 +331,26 @@
     document.getElementById('next-task').onclick = () => switchTask(1);
     document.getElementById('submit-drawing').onclick = submitCurrentDrawing;
 
+    // In drawer-picks-persona mode, show the persona picker
+    const drawerMode = state.public.config?.PERSONA_MODE === 'drawer';
+    const personaRow = document.getElementById('drawer-persona-row');
+    const personaIn = document.getElementById('drawer-persona-input');
+    if (drawerMode && personaRow) {
+      personaRow.hidden = false;
+      const chips = document.getElementById('drawer-persona-chips');
+      const sugg = state.private?.personaSuggestions || [];
+      if (chips && sugg.length && chips.children.length === 0) {
+        for (const p of sugg) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'chip';
+          b.textContent = p;
+          b.onclick = () => { personaIn.value = p; };
+          chips.appendChild(b);
+        }
+      }
+    }
+
     state.drawing.refresh = loadActiveTask;
     loadActiveTask();
     updateDrawingStatus();
@@ -365,6 +406,9 @@
         const cached = state.drawing.cachedPngs[t.writerId];
         canvas.loadPng(cached || null);
       }
+      // Restore drawer's persona pick if they already submitted one
+      const dpi = document.getElementById('drawer-persona-input');
+      if (dpi && t.myPersona) dpi.value = t.myPersona;
       if (btn) {
         btn.disabled = false;
         btn.textContent = t.submitted ? '✓ Submitted — Resubmit?' : 'Submit Thumbnail';
@@ -380,7 +424,8 @@
       btn.textContent = 'Submitting…';
       const png = canvas.toDataURL();
       state.drawing.cachedPngs[t.writerId] = png;
-      socket.emit('submit-drawing', { writerId: t.writerId, png }, (res) => {
+      const drawPersona = document.getElementById('drawer-persona-input')?.value || '';
+      socket.emit('submit-drawing', { writerId: t.writerId, png, persona: drawPersona }, (res) => {
         btn.disabled = false;
         if (res && res.error) {
           btn.textContent = 'Try Submitting Again';
@@ -495,9 +540,13 @@
       const card = document.createElement('div');
       card.className = 'vs-card';
       const label = String.fromCharCode(65 + i);
+      const personaLine = t.persona
+        ? `<div class="vs-persona">${escapeHtml(t.persona)}</div>`
+        : '';
       card.innerHTML = `
         <div class="vs-letter">${label}</div>
         <img src="${t.png}" alt="Thumbnail ${label}" />
+        ${personaLine}
         <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
       `;
       card.querySelector('.vote-btn').onclick = () => {
