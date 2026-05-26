@@ -2,11 +2,11 @@
   --bg: #0f0f0f;
   --surface: #1e1e1e;
   --surface-2: #272727;
-  --text: #f1f1f1;
+  --text: #f5f5f5;
   --muted: #aaa;
   --border: #303030;
-  --yt-red: #ff0033;
-  --yt-red-hover: #e60029;
+  --yt-red: #ff2d55;
+  --yt-red-hover: #e6264c;
   --accent: #3ea6ff;
   --success: #2ecc71;
   --warn: #ffb020;
@@ -28,6 +28,14 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4,
+.brand-name,
+.big-code,
+.big-code-xxl,
+.champ-name {
+  font-family: 'Archivo Black', 'Impact', sans-serif;
 }
 
 a {
@@ -153,11 +161,16 @@ button {
   text-align: center;
   margin-bottom: 32px;
 }
-.tagline {
-  color: var(--muted);
-  font-size: 18px;
-  max-width: 540px;
-  margin: 10px auto 0;
+.hero-headline {
+  font-family: 'Archivo Black', 'Impact', sans-serif;
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.1;
+  color: var(--text);
+  margin: 16px 0 0;
+  letter-spacing: -0.01em;
+}
+.hero-accent {
+  color: var(--yt-red);
 }
 
 .landing-main {
