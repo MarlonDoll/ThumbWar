@@ -66,25 +66,25 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 32px;
   background: var(--yt-red);
   color: white;
-  border-radius: 50%;
+  border-radius: 8px;
   padding: 0;
   flex-shrink: 0;
 }
 .brand-play svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 .brand.small .brand-play {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 22px;
 }
 .brand.small .brand-play svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 .brand-accent {
   color: var(--yt-red);
