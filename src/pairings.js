@@ -37,10 +37,9 @@ function buildAssignments(playerIds) {
     return assignments;
   }
 
-  // 4+ players: 2 drawers per title. Drawer k for writer i is
-  // player[(i + k + 1) % n] with k in {0, 1}. This keeps each
-  // player drawing exactly 2 titles and rotates matchups.
-  const drawersPerTitle = n >= 6 ? 3 : 2;
+  // 4+ players: always 2 drawers per title for cleaner VS battles
+  // and faster rounds. Each player draws exactly 2 titles.
+  const drawersPerTitle = 2;
   for (let i = 0; i < n; i++) {
     const drawers = [];
     for (let k = 1; k <= drawersPerTitle; k++) {
