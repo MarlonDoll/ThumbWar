@@ -46,7 +46,7 @@ async function run() {
   p2.on('private', (pv) => (privs.p2 = pv));
   p3.on('private', (pv) => (privs.p3 = pv));
 
-  await wait(600);
+  await wait(800);
   console.log('players in lobby:', states.host.players.length);
 
   // Set rounds to 1 for a quick smoke test

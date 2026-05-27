@@ -619,9 +619,9 @@
       return;
     }
     const m = voting.matchup;
-    document.getElementById('vote-title-row').textContent = m.title.title;
-    document.getElementById('vote-progress').textContent =
-      `Matchup ${voting.index + 1} of ${voting.total} · ${m.title.persona}`;
+    document.getElementById('vote-title-row').textContent =
+      `Matchup ${voting.index + 1} of ${voting.total}`;
+    document.getElementById('vote-progress').textContent = '';
 
     const arena = document.getElementById('thumb-choices');
     arena.innerHTML = '';
@@ -640,9 +640,17 @@
       const card = document.createElement('div');
       card.className = 'vs-card';
       const label = String.fromCharCode(65 + i);
-      const personaLine = t.persona
-        ? `<div class="vs-persona">${escapeHtml(t.persona)}</div>`
-        : '';
+      const creator = t.persona || m.title.persona || '';
+      const creatorInitial = (creator || '?').replace(/^(a|an|the|your|my)\s+/i,'').charAt(0).toUpperCase();
+      const ytMeta = `
+        <div class="vs-yt-meta">
+          <div class="vs-yt-avatar">${creatorInitial}</div>
+          <div class="vs-yt-text">
+            <div class="vs-yt-title">${escapeHtml(m.title.title)}</div>
+            <div class="vs-yt-channel">${escapeHtml(creator)}</div>
+          </div>
+        </div>
+      `;
 
       if (hasResults) {
         const isWinner = m.results.winners.includes(t.id);
@@ -651,7 +659,7 @@
         card.innerHTML = `
           <div class="vs-letter">${label}</div>
           <img src="${t.png}" alt="Thumbnail ${label}" />
-          ${personaLine}
+          ${ytMeta}
           <div class="vote-result ${isWinner ? 'vote-result-winner' : ''}">
             ${isWinner ? '🏆 ' : ''}${voteCount} vote${voteCount !== 1 ? 's' : ''}
           </div>
@@ -660,7 +668,7 @@
         card.innerHTML = `
           <div class="vs-letter">${label}</div>
           <img src="${t.png}" alt="Thumbnail ${label}" />
-          ${personaLine}
+          ${ytMeta}
           <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
         `;
         card.querySelector('.vote-btn').onclick = () => {
