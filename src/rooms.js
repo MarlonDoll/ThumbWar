@@ -9,6 +9,7 @@ const PHASES = {
   WRITING: 'writing',
   DRAWING: 'drawing',
   VOTING: 'voting',
+  SCOREBOARD: 'scoreboard',
   BROWSE: 'browse',
   RESULTS: 'results'
 };
@@ -18,7 +19,7 @@ const DEFAULTS = {
   DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 60,
-  PERSONA_MODE: 'writer', // 'writer' | 'drawer'
+  PERSONA_MODE: 'drawer', // 'writer' | 'drawer'
   ROUNDS: 3
 };
 
@@ -403,8 +404,22 @@ class RoomManager {
     // Accumulate this round's matchup results for cross-round stats
     room.allMatchupResults.push(...room.round.matchupResults);
 
-    // Check if there are more rounds to play
-    if (room.currentRound < room.config.ROUNDS - 1) {
+    // Show scoreboard between rounds (or before browse on final round)
+    room.phase = PHASES.SCOREBOARD;
+    room.scoreboard = {
+      scores: { ...room.scores },
+      roundJustFinished: room.currentRound + 1,
+      totalRounds: room.config.ROUNDS,
+      isLastRound: room.currentRound >= room.config.ROUNDS - 1
+    };
+    this._startTimer(room, 8, () => this._finishScoreboard(room));
+  }
+
+  _finishScoreboard(room) {
+    if (room.phase !== PHASES.SCOREBOARD) return;
+    this._clearTimer(room);
+
+    if (!room.scoreboard.isLastRound) {
       room.currentRound += 1;
       this._startRound(room);
       this._broadcastAll(room);
@@ -654,6 +669,9 @@ class RoomManager {
         ),
         submittedByDrawer
       };
+    }
+    if (room.phase === PHASES.SCOREBOARD) {
+      base.scoreboard = room.scoreboard;
     }
     if (room.phase === PHASES.VOTING) {
       const m = this._currentMatchup(room);

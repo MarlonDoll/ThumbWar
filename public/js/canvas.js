@@ -70,6 +70,18 @@
       for (const [ev, fn] of Object.entries(handlers)) {
         c.addEventListener(ev, fn);
       }
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          e.preventDefault();
+          this.undo();
+        } else if (
+          (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) ||
+          (e.key === 'y' && (e.ctrlKey || e.metaKey))
+        ) {
+          e.preventDefault();
+          this.redo();
+        }
+      });
     }
 
     _coords(e) {

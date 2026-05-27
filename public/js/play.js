@@ -672,6 +672,42 @@
     }
   }
 
+  function renderScoreboard() {
+    renderTemplate('tpl-scoreboard');
+    const sb = state.public.scoreboard;
+    if (!sb) return;
+    const nameOf = (id) => {
+      const p = state.public.players.find((x) => x.id === id);
+      return p ? p.name : 'Unknown';
+    };
+    const titleEl = document.getElementById('scoreboard-title');
+    const subEl = document.getElementById('scoreboard-sub');
+    const nextEl = document.getElementById('scoreboard-next');
+
+    titleEl.textContent = sb.isLastRound
+      ? 'Final Round Complete!'
+      : `Round ${sb.roundJustFinished} of ${sb.totalRounds} Complete`;
+    subEl.textContent = sb.isLastRound
+      ? 'Here are the scores before the final vote.'
+      : `Next round starting soon…`;
+    nextEl.textContent = sb.isLastRound
+      ? 'The browse page is next — pick the best concept.'
+      : `Round ${sb.roundJustFinished + 1} starts in a few seconds.`;
+
+    const board = document.getElementById('mid-scoreboard');
+    board.innerHTML = '';
+    Object.entries(sb.scores)
+      .map(([id, s]) => ({ id, s, name: nameOf(id) }))
+      .sort((a, b) => b.s - a.s)
+      .forEach((row, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="rank">${i + 1}</span>
+          <span class="name">${escapeHtml(row.name)}</span>
+          <span class="score">${row.s}</span>`;
+        board.appendChild(li);
+      });
+  }
+
   function renderBrowse() {
     renderTemplate('tpl-browse');
     const grid = document.getElementById('browse-grid');
@@ -862,6 +898,7 @@
       if (!state.drawing.canvas) renderDrawing();
       else updateDrawingStatus();
     }
+    else if (phase === 'scoreboard') renderScoreboard();
     else if (phase === 'browse') renderBrowse();
     else if (phase === 'results') renderResults();
   }

@@ -46,7 +46,7 @@ async function run() {
   p2.on('private', (pv) => (privs.p2 = pv));
   p3.on('private', (pv) => (privs.p3 = pv));
 
-  await wait(400);
+  await wait(600);
   console.log('players in lobby:', states.host.players.length);
 
   // Set rounds to 1 for a quick smoke test
@@ -104,6 +104,10 @@ async function run() {
     await wait(250);
   }
   console.log('phase after voting:', states.host.phase);
+
+  // Wait through scoreboard phase if present
+  for (let i = 0; i < 40 && states.host.phase === 'scoreboard'; i++) await wait(300);
+  console.log('phase after scoreboard:', states.host.phase);
 
   // Browse vote — single "best" category
   if (states.host.phase === 'browse') {

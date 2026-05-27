@@ -35,6 +35,7 @@
     if (p.phase === 'writing') return renderWriting();
     if (p.phase === 'drawing') return renderDrawing();
     if (p.phase === 'voting') return renderVoting();
+    if (p.phase === 'scoreboard') return renderScoreboard();
     if (p.phase === 'browse') return renderBrowse();
     if (p.phase === 'results') return renderResults();
   }
@@ -137,6 +138,31 @@
       `;
       row.appendChild(card);
     });
+  }
+
+  function renderScoreboard() {
+    useTpl('host-tpl-scoreboard');
+    const sb = state.public.scoreboard;
+    if (!sb) return;
+    const nameOf = (id) => {
+      const p = state.public.players.find((x) => x.id === id);
+      return p ? p.name : 'Unknown';
+    };
+    document.getElementById('host-sb-title').textContent = sb.isLastRound
+      ? 'Final Round Complete!'
+      : `Round ${sb.roundJustFinished} / ${sb.totalRounds} Complete`;
+    const board = document.getElementById('host-sb-list');
+    board.innerHTML = '';
+    Object.entries(sb.scores)
+      .map(([id, s]) => ({ id, s, name: nameOf(id) }))
+      .sort((a, b) => b.s - a.s)
+      .forEach((row, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="rank">${i + 1}</span>
+          <span class="name">${escapeHtml(row.name)}</span>
+          <span class="score">${row.s}</span>`;
+        board.appendChild(li);
+      });
   }
 
   function renderBrowse() {
