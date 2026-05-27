@@ -357,9 +357,9 @@ class RoomManager {
             winners
           });
           room.round.voteIndex += 1;
-          this._broadcastAll(room);
           if (room.round.voteIndex >= room.round.voting.length) {
             this._finishVoting(room);
+            this._broadcastAll(room);
           } else {
             this._beginCurrentMatchup(room);
           }
@@ -377,9 +377,9 @@ class RoomManager {
       });
     }
     room.round.voteIndex += 1;
-    this._broadcastAll(room);
     if (room.round.voteIndex >= room.round.voting.length) {
       this._finishVoting(room);
+      this._broadcastAll(room);
     } else {
       this._beginCurrentMatchup(room);
     }
