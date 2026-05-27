@@ -109,14 +109,21 @@ async function run() {
   for (let i = 0; i < 40 && states.host.phase === 'scoreboard'; i++) await wait(300);
   console.log('phase after scoreboard:', states.host.phase);
 
-  // Browse vote — single "best" category
+  // Browse vote — single "best" category (can't vote for own concept)
   if (states.host.phase === 'browse') {
     const concepts = states.host.browse.concepts;
-    for (const [, sock] of [['host', host], ['p2', p2], ['p3', p3]]) {
-      await emitAsync(sock, 'submit-browse-vote', {
+    const playerIds = [created.playerId, joined1.playerId, joined2.playerId];
+    const socks = [host, p2, p3];
+    for (let i = 0; i < 3; i++) {
+      const myId = playerIds[i];
+      const eligible = concepts.filter((c) => c.artistId !== myId);
+      if (eligible.length === 0) continue;
+      const pick = eligible[Math.floor(Math.random() * eligible.length)];
+      const bres = await emitAsync(socks[i], 'submit-browse-vote', {
         category: 'best',
-        conceptId: concepts[Math.floor(Math.random() * concepts.length)].id
+        conceptId: pick.id
       });
+      if (bres && bres.error) console.log('browse vote error for player', i, ':', bres.error);
     }
   }
 

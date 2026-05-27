@@ -426,8 +426,8 @@ class RoomManager {
       return;
     }
 
-    // Last round — build browse page: each concept = title + winning thumbnail (or first if tie)
-    const concepts = room.round.matchupResults.map((r) => {
+    // Last round — build browse page from ALL rounds' matchup results
+    const concepts = room.allMatchupResults.map((r) => {
       let winnerId = r.winners[0];
       if (!winnerId && r.thumbnails.length > 0) winnerId = r.thumbnails[0].id;
       const winningThumb = r.thumbnails.find((t) => t.id === winnerId) || r.thumbnails[0] || null;
@@ -462,6 +462,9 @@ class RoomManager {
     }
     const concept = room.browse.concepts.find((c) => c.id === conceptId);
     if (!concept) return { error: 'Unknown concept' };
+    if (concept.artistId === playerId) {
+      return { error: 'You can\'t vote for your own thumbnail' };
+    }
     room.browse.votes[category][conceptId] =
       (room.browse.votes[category][conceptId] || 0) + 1;
     room.browse.votedBy[category].add(playerId);
@@ -697,6 +700,8 @@ class RoomManager {
       base.browse = {
         concepts: room.browse.concepts.map((c) => ({
           id: c.id,
+          writerId: c.writerId,
+          artistId: c.artistId,
           title: c.title,
           thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null
         })),

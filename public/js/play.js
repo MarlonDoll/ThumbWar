@@ -717,22 +717,26 @@
     const alreadyVoted = votedBy.includes(state.playerId);
 
     concepts.forEach((c) => {
+      const isMine = c.artistId === state.playerId;
       const card = document.createElement('div');
-      card.className = 'browse-card';
+      card.className = 'browse-card' + (isMine ? ' browse-card-mine' : '');
       card.innerHTML = `
         ${c.thumbnail ? `<img src="${c.thumbnail.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
+        ${isMine ? '<div class="browse-yours">Yours</div>' : ''}
       `;
-      card.onclick = () => {
-        socket.emit(
-          'submit-browse-vote',
-          { category: 'best', conceptId: c.id },
-          (res) => {
-            if (res && res.error) return showToast(res.error);
-            showToast('Voted!');
-          }
-        );
-      };
+      if (!isMine) {
+        card.onclick = () => {
+          socket.emit(
+            'submit-browse-vote',
+            { category: 'best', conceptId: c.id },
+            (res) => {
+              if (res && res.error) return showToast(res.error);
+              showToast('Voted!');
+            }
+          );
+        };
+      }
       grid.appendChild(card);
     });
 

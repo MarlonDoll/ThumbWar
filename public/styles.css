@@ -914,9 +914,22 @@ textarea.input-xl {
   cursor: pointer;
   transition: transform 0.1s, border-color 0.1s;
 }
-.browse-card:hover {
+.browse-card:hover:not(.browse-card-mine) {
   transform: translateY(-2px);
   border-color: var(--yt-red);
+}
+.browse-card-mine {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+.browse-yours {
+  padding: 4px 14px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 .browse-card img {
   width: 100%;
