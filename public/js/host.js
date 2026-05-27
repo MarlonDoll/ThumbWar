@@ -204,20 +204,24 @@
       });
 
     const awards = document.getElementById('host-awards');
-    const bestData = r.awardResults?.best;
-    if (bestData && bestData.winners && bestData.winners.length > 0) {
-      const concept = (r.concepts || []).find((c) => c.id === bestData.winners[0]);
-      if (concept) {
-        const card = document.createElement('div');
-        card.className = 'award-card';
-        card.innerHTML = `
-          <h3>⭐ Best Concept</h3>
-          ${concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
-          <p class="award-title">${escapeHtml(concept.title.title)}</p>
-          <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
-        `;
-        awards.appendChild(card);
-      }
+    const awardDefs = [
+      { key: 'bestThumb', label: '🎨 Best Thumbnail', showThumb: true },
+      { key: 'bestTitle', label: '✍️ Best Title Idea', showThumb: false }
+    ];
+    for (const { key, label, showThumb } of awardDefs) {
+      const data = r.awardResults?.[key];
+      if (!data || !data.winners || data.winners.length === 0) continue;
+      const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
+      if (!concept) continue;
+      const card = document.createElement('div');
+      card.className = 'award-card';
+      card.innerHTML = `
+        <h3>${label}</h3>
+        ${showThumb && concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
+        <p class="award-title">${escapeHtml(concept.title.title)}</p>
+        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
+      `;
+      awards.appendChild(card);
     }
   }
 

@@ -923,6 +923,17 @@ textarea.input-xl {
   cursor: default;
   pointer-events: none;
 }
+.browse-card-title {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 80px;
+}
+.browse-card-title .browse-title {
+  padding: 0;
+  font-size: 17px;
+}
 .browse-yours {
   padding: 4px 14px 10px;
   color: var(--muted);

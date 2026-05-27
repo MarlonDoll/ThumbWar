@@ -109,21 +109,23 @@ async function run() {
   for (let i = 0; i < 40 && states.host.phase === 'scoreboard'; i++) await wait(300);
   console.log('phase after scoreboard:', states.host.phase);
 
-  // Browse vote — single "best" category (can't vote for own concept)
+  // Browse votes — bestThumb + bestTitle (can't vote for own)
   if (states.host.phase === 'browse') {
     const concepts = states.host.browse.concepts;
     const playerIds = [created.playerId, joined1.playerId, joined2.playerId];
     const socks = [host, p2, p3];
     for (let i = 0; i < 3; i++) {
       const myId = playerIds[i];
-      const eligible = concepts.filter((c) => c.artistId !== myId);
-      if (eligible.length === 0) continue;
-      const pick = eligible[Math.floor(Math.random() * eligible.length)];
-      const bres = await emitAsync(socks[i], 'submit-browse-vote', {
-        category: 'best',
-        conceptId: pick.id
-      });
-      if (bres && bres.error) console.log('browse vote error for player', i, ':', bres.error);
+      const thumbEligible = concepts.filter((c) => c.artistId !== myId);
+      const titleEligible = concepts.filter((c) => c.writerId !== myId);
+      if (thumbEligible.length > 0) {
+        const pick = thumbEligible[Math.floor(Math.random() * thumbEligible.length)];
+        await emitAsync(socks[i], 'submit-browse-vote', { category: 'bestThumb', conceptId: pick.id });
+      }
+      if (titleEligible.length > 0) {
+        const pick = titleEligible[Math.floor(Math.random() * titleEligible.length)];
+        await emitAsync(socks[i], 'submit-browse-vote', { category: 'bestTitle', conceptId: pick.id });
+      }
     }
   }
 

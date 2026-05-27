@@ -444,8 +444,8 @@ class RoomManager {
 
     room.browse = {
       concepts,
-      votes: { best: {} },
-      votedBy: { best: new Set() }
+      votes: { bestThumb: {}, bestTitle: {} },
+      votedBy: { bestThumb: new Set(), bestTitle: new Set() }
     };
     room.phase = PHASES.BROWSE;
     this._startTimer(room, room.config.BROWSE_SECONDS, () => this._finishBrowse(room));
@@ -462,17 +462,22 @@ class RoomManager {
     }
     const concept = room.browse.concepts.find((c) => c.id === conceptId);
     if (!concept) return { error: 'Unknown concept' };
-    if (concept.artistId === playerId) {
+    if (category === 'bestThumb' && concept.artistId === playerId) {
       return { error: 'You can\'t vote for your own thumbnail' };
+    }
+    if (category === 'bestTitle' && concept.writerId === playerId) {
+      return { error: 'You can\'t vote for your own title' };
     }
     room.browse.votes[category][conceptId] =
       (room.browse.votes[category][conceptId] || 0) + 1;
     room.browse.votedBy[category].add(playerId);
-    room.browse.votedByChoice = room.browse.votedByChoice || { best: {} };
+    room.browse.votedByChoice = room.browse.votedByChoice || { bestThumb: {}, bestTitle: {} };
     room.browse.votedByChoice[category][playerId] = conceptId;
 
     const active = room.players.filter((p) => !p.spectator);
-    const allDone = active.every((p) => room.browse.votedBy.best.has(p.id));
+    const allDone = ['bestThumb', 'bestTitle'].every((cat) =>
+      active.every((p) => room.browse.votedBy[cat].has(p.id))
+    );
     if (allDone) this._finishBrowse(room);
     return { ok: true };
   }
@@ -705,7 +710,10 @@ class RoomManager {
           title: c.title,
           thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null
         })),
-        votedBy: [...room.browse.votedBy.best]
+        votedBy: {
+          bestThumb: [...room.browse.votedBy.bestThumb],
+          bestTitle: [...room.browse.votedBy.bestTitle]
+        }
       };
     }
     if (room.phase === PHASES.RESULTS) {

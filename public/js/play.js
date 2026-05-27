@@ -710,39 +710,61 @@
 
   function renderBrowse() {
     renderTemplate('tpl-browse');
-    const grid = document.getElementById('browse-grid');
-    grid.innerHTML = '';
     const concepts = (state.public.browse && state.public.browse.concepts) || [];
-    const votedBy = state.public.browse.votedBy || [];
-    const alreadyVoted = votedBy.includes(state.playerId);
+    const votedBy = state.public.browse.votedBy || {};
 
+    // Best Thumbnail grid
+    const thumbGrid = document.getElementById('browse-thumb-grid');
+    thumbGrid.innerHTML = '';
+    const thumbVoted = (votedBy.bestThumb || []).includes(state.playerId);
     concepts.forEach((c) => {
-      const isMine = c.artistId === state.playerId;
+      const isMyArt = c.artistId === state.playerId;
       const card = document.createElement('div');
-      card.className = 'browse-card' + (isMine ? ' browse-card-mine' : '');
+      card.className = 'browse-card' + (isMyArt ? ' browse-card-mine' : '');
       card.innerHTML = `
         ${c.thumbnail ? `<img src="${c.thumbnail.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
-        ${isMine ? '<div class="browse-yours">Yours</div>' : ''}
+        ${isMyArt ? '<div class="browse-yours">Your art</div>' : ''}
       `;
-      if (!isMine) {
+      if (!isMyArt) {
         card.onclick = () => {
-          socket.emit(
-            'submit-browse-vote',
-            { category: 'best', conceptId: c.id },
-            (res) => {
-              if (res && res.error) return showToast(res.error);
-              showToast('Voted!');
-            }
-          );
+          socket.emit('submit-browse-vote', { category: 'bestThumb', conceptId: c.id }, (res) => {
+            if (res && res.error) return showToast(res.error);
+            showToast('Voted for Best Thumbnail!');
+          });
         };
       }
-      grid.appendChild(card);
+      thumbGrid.appendChild(card);
     });
+    document.getElementById('browse-thumb-status').textContent = thumbVoted
+      ? '✓ Voted. Tap a different one to change.'
+      : '';
 
-    document.getElementById('browse-status').textContent = alreadyVoted
-      ? 'You\'ve voted. Tap a different one to change your pick.'
-      : 'Tap the concept you think is the best overall.';
+    // Best Title grid
+    const titleGrid = document.getElementById('browse-title-grid');
+    titleGrid.innerHTML = '';
+    const titleVoted = (votedBy.bestTitle || []).includes(state.playerId);
+    concepts.forEach((c) => {
+      const isMyTitle = c.writerId === state.playerId;
+      const card = document.createElement('div');
+      card.className = 'browse-card browse-card-title' + (isMyTitle ? ' browse-card-mine' : '');
+      card.innerHTML = `
+        <div class="browse-title">${escapeHtml(c.title.title)}</div>
+        ${isMyTitle ? '<div class="browse-yours">Your title</div>' : ''}
+      `;
+      if (!isMyTitle) {
+        card.onclick = () => {
+          socket.emit('submit-browse-vote', { category: 'bestTitle', conceptId: c.id }, (res) => {
+            if (res && res.error) return showToast(res.error);
+            showToast('Voted for Best Title!');
+          });
+        };
+      }
+      titleGrid.appendChild(card);
+    });
+    document.getElementById('browse-title-status').textContent = titleVoted
+      ? '✓ Voted. Tap a different one to change.'
+      : '';
   }
 
   function renderResults() {
@@ -778,20 +800,24 @@
 
     const awards = document.getElementById('awards');
     awards.innerHTML = '';
-    const bestData = r.awardResults?.best;
-    if (bestData && bestData.winners && bestData.winners.length > 0) {
-      const concept = (r.concepts || []).find((c) => c.id === bestData.winners[0]);
-      if (concept) {
-        const card = document.createElement('div');
-        card.className = 'award-card';
-        card.innerHTML = `
-          <h3>⭐ Best Concept</h3>
-          ${concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
-          <p class="award-title">${escapeHtml(concept.title.title)}</p>
-          <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
-        `;
-        awards.appendChild(card);
-      }
+    const awardDefs = [
+      { key: 'bestThumb', label: '🎨 Best Thumbnail', showThumb: true },
+      { key: 'bestTitle', label: '✍️ Best Title Idea', showThumb: false }
+    ];
+    for (const { key, label, showThumb } of awardDefs) {
+      const data = r.awardResults?.[key];
+      if (!data || !data.winners || data.winners.length === 0) continue;
+      const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
+      if (!concept) continue;
+      const card = document.createElement('div');
+      card.className = 'award-card';
+      card.innerHTML = `
+        <h3>${label}</h3>
+        ${showThumb && concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
+        <p class="award-title">${escapeHtml(concept.title.title)}</p>
+        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
+      `;
+      awards.appendChild(card);
     }
 
     // Fun stat awards
