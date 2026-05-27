@@ -69,19 +69,31 @@
     const input = document.getElementById('text-modal-input');
     const sizeIn = document.getElementById('text-modal-size');
     const colorIn = document.getElementById('text-modal-color');
+    const fontIn = document.getElementById('text-modal-font');
+    const boldBtn = document.getElementById('text-modal-bold');
     const preview = document.getElementById('text-modal-preview');
     const cancel = document.getElementById('text-modal-cancel');
     const confirm = document.getElementById('text-modal-confirm');
     let pendingConfirm = null;
+    let isBold = true;
 
     function refreshPreview() {
       preview.textContent = input.value || 'YOUR THUMBNAIL TEXT';
       preview.style.fontSize = sizeIn.value + 'px';
       preview.style.color = colorIn.value;
+      preview.style.fontFamily = fontIn.value + ', sans-serif';
+      preview.style.fontWeight = isBold ? '900' : '400';
+      preview.style.webkitTextStroke = isBold ? '2px black' : '1px black';
+      boldBtn.classList.toggle('btn-primary', isBold);
     }
     input.addEventListener('input', refreshPreview);
     sizeIn.addEventListener('input', refreshPreview);
     colorIn.addEventListener('input', refreshPreview);
+    fontIn.addEventListener('change', refreshPreview);
+    boldBtn.addEventListener('click', () => {
+      isBold = !isBold;
+      refreshPreview();
+    });
 
     function close() {
       modal.hidden = true;
@@ -96,7 +108,9 @@
       const payload = {
         text: input.value.trim(),
         size: parseInt(sizeIn.value, 10),
-        color: colorIn.value
+        color: colorIn.value,
+        font: fontIn.value,
+        bold: isBold
       };
       close();
       if (cb && payload.text) cb(payload);
@@ -106,6 +120,8 @@
       input.value = '';
       sizeIn.value = size || 64;
       colorIn.value = color || '#ffd400';
+      fontIn.value = 'Impact';
+      isBold = true;
       pendingConfirm = onConfirm;
       modal.hidden = false;
       refreshPreview();
@@ -599,7 +615,7 @@
     renderTemplate('tpl-voting');
     const voting = state.public.voting;
     if (!voting || !voting.matchup) {
-      app.innerHTML = '<section class="panel"><h1>Preparing the next matchup…</h1></section>';
+      app.innerHTML = '<section class="panel thumbwar-countdown"><h1>1, 2, 3, 4…</h1><h1 class="hero-accent">I declare a ThumbWar!</h1></section>';
       return;
     }
     const m = voting.matchup;

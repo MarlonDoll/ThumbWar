@@ -28,6 +28,8 @@
       this.color = '#000000';
       this.size = 6;
       this.textSize = 48;
+      this.textFont = 'Impact';
+      this.textBold = true;
       this.opacity = 1;
 
       this.undoStack = [];
@@ -115,15 +117,19 @@
             color: this.color,
             size: this.textSize,
             opacity: this.opacity,
-            onConfirm: ({ text, size, color }) => {
+            onConfirm: ({ text, size, color, font, bold }) => {
               if (!text) return;
-              const prev = { color: this.color, size: this.textSize };
+              const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
               this.color = color;
               this.textSize = size;
+              this.textFont = font || 'Impact';
+              this.textBold = bold !== false;
               this._drawText(x, y, text);
               this._pushUndo();
               this.color = prev.color;
               this.textSize = prev.size;
+              this.textFont = prev.font;
+              this.textBold = prev.bold;
             }
           });
         } else {
@@ -259,9 +265,10 @@
       ctx.save();
       ctx.fillStyle = this.color;
       ctx.globalAlpha = this.opacity;
-      ctx.font = `800 ${this.textSize}px Impact, "Arial Black", sans-serif`;
+      const weight = this.textBold ? '900' : '400';
+      const font = this.textFont || 'Impact';
+      ctx.font = `${weight} ${this.textSize}px "${font}", "Arial Black", sans-serif`;
       ctx.textBaseline = 'top';
-      // Thumbnail-style stroke
       ctx.lineWidth = Math.max(2, this.textSize * 0.08);
       ctx.strokeStyle = '#000000';
       ctx.lineJoin = 'round';

@@ -671,6 +671,31 @@ textarea.input-xl {
   align-items: center;
   justify-content: center;
 }
+.modal-card select {
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.modal-card select:focus {
+  border-color: var(--yt-red);
+}
+#text-modal-bold {
+  font-weight: 900;
+  min-width: 36px;
+}
+.thumbwar-countdown {
+  text-align: center;
+  padding: 60px 20px;
+}
+.thumbwar-countdown h1 {
+  font-size: clamp(32px, 5vw, 52px);
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
