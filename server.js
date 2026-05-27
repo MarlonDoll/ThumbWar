@@ -217,6 +217,19 @@ io.on('connection', (socket) => {
     }
     // Don't immediately remove the player — page navigations (landing -> /play)
     // disconnect briefly. The cleanup sweep will remove truly stale players.
+    //
+    // Re-check phase completion: if a disconnected player was the one everyone
+    // was waiting on, the game should advance rather than hang.
+    if (room.phase === 'writing' && room.round) {
+      if (rooms._allWritersSubmitted(room)) rooms._finishWriting(room);
+    }
+    if (room.phase === 'drawing' && room.round) {
+      if (rooms._allDrawingsSubmitted(room)) rooms._finishDrawing(room);
+    }
+    if (room.phase === 'voting' && room.round) {
+      const m = rooms._currentMatchup(room);
+      if (m && rooms._allEligibleVoted(room, m)) rooms._advanceMatchup(room);
+    }
     broadcastState(room);
   });
 });

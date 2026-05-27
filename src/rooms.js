@@ -116,12 +116,17 @@ class RoomManager {
     room.players = room.players.filter((p) => p.id !== playerId);
   }
 
+  // Players who are active (not spectator) and currently connected.
+  _connectedActive(room) {
+    return room.players.filter((p) => !p.spectator && p.connected);
+  }
+
   // ----- game lifecycle -----
 
   startGame(room) {
     if (room.phase !== PHASES.LOBBY) return { error: 'Already started' };
-    const active = room.players.filter((p) => !p.spectator);
-    if (active.length < 1) return { error: 'Need at least 1 player' };
+    const active = this._connectedActive(room);
+    if (active.length < 1) return { error: 'Need at least 1 connected player' };
 
     room.currentRound = 0;
     room.scores = {};
@@ -131,7 +136,7 @@ class RoomManager {
   }
 
   _startRound(room) {
-    const active = room.players.filter((p) => !p.spectator);
+    const active = this._connectedActive(room);
     room.phase = PHASES.WRITING;
     room.round = {
       writers: active.map((p) => p.id),
@@ -177,7 +182,10 @@ class RoomManager {
   }
 
   _allWritersSubmitted(room) {
-    return room.round.writers.every((id) => room.round.titles[id]);
+    const connected = new Set(this._connectedActive(room).map((p) => p.id));
+    return room.round.writers
+      .filter((id) => connected.has(id))
+      .every((id) => room.round.titles[id]);
   }
 
   _finishWriting(room) {
@@ -239,7 +247,9 @@ class RoomManager {
   }
 
   _allDrawingsSubmitted(room) {
+    const connected = new Set(this._connectedActive(room).map((p) => p.id));
     for (const [drawerId, writerIds] of Object.entries(room.round.drawTasks || {})) {
+      if (!connected.has(drawerId)) continue;
       for (const writerId of writerIds) {
         const arr = room.round.drawings[writerId] || [];
         if (!arr.some((d) => d.artistId === drawerId)) return false;
@@ -252,20 +262,23 @@ class RoomManager {
     if (room.phase !== PHASES.DRAWING) return;
     this._clearTimer(room);
 
-    // Build voting queue: one matchup per written title.
-    const queue = room.round.writers.map((writerId) => {
+    // Build voting queue — only for titles that have at least 1 thumbnail.
+    // Titles with no submissions (all assigned drawers dropped) are skipped.
+    const queue = [];
+    for (const writerId of Object.keys(room.round.assignments || {})) {
       const title = room.round.titles[writerId];
+      if (!title) continue;
       const thumbs = (room.round.drawings[writerId] || []).slice();
-      // Shuffle thumbnail display order for blind voting
+      if (thumbs.length === 0) continue;
       thumbs.sort(() => Math.random() - 0.5);
-      return {
+      queue.push({
         writerId,
         title,
         thumbnails: thumbs,
         votes: {},
         votedBy: new Set()
-      };
-    });
+      });
+    }
     room.round.voting = queue;
     room.round.voteIndex = 0;
     room.phase = PHASES.VOTING;
@@ -316,13 +329,12 @@ class RoomManager {
 
   _allEligibleVoted(room, matchup) {
     const eligible = room.players.filter((p) => {
-      if (p.spectator) return false;
+      if (p.spectator || !p.connected) return false;
       const isArtistInMatchup = matchup.thumbnails.some(
         (t) => t.artistId === p.id
       );
       return !isArtistInMatchup;
     });
-    // If no one is eligible (tiny groups), let the timer run out.
     if (eligible.length === 0) return false;
     return eligible.every((p) => matchup.votedBy.has(p.id));
   }
@@ -474,7 +486,7 @@ class RoomManager {
     room.browse.votedByChoice = room.browse.votedByChoice || { bestThumb: {}, bestTitle: {} };
     room.browse.votedByChoice[category][playerId] = conceptId;
 
-    const active = room.players.filter((p) => !p.spectator);
+    const active = this._connectedActive(room);
     const allDone = ['bestThumb', 'bestTitle'].every((cat) =>
       active.every((p) => room.browse.votedBy[cat].has(p.id))
     );
