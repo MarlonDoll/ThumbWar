@@ -70,29 +70,37 @@
 
     <template id="tpl-lobby">
       <section class="lobby panel">
-        <h1>Waiting for players</h1>
-        <p class="lobby-code-row">
-          Room code:
-          <code id="lobby-code" class="big-code">----</code>
-          <button class="btn btn-ghost btn-sm" id="copy-code">Copy</button>
-          <button class="btn btn-ghost btn-sm" id="open-display">Open display</button>
-        </p>
-        <div class="player-grid" id="lobby-players"></div>
-        <div class="lobby-actions">
-          <div class="lobby-options">
-            <label class="spectator-toggle">
-              <input type="checkbox" id="spectator" /> Spectator mode
-            </label>
-            <div class="persona-mode-row" id="persona-mode-row">
-              <span class="muted small">Who picks the creator?</span>
-              <button class="btn btn-sm" id="pm-writer">Writer</button>
-              <button class="btn btn-sm" id="pm-drawer">Drawer</button>
+        <div class="lobby-hero">
+          <h1>ThumbWar Lobby</h1>
+          <div class="lobby-code-block">
+            <span class="lobby-code-label">Room code</span>
+            <code id="lobby-code" class="big-code">----</code>
+            <div class="lobby-code-actions">
+              <button class="btn btn-ghost btn-sm" id="copy-code">📋 Copy</button>
+              <button class="btn btn-ghost btn-sm" id="open-display">📺 Display</button>
             </div>
-            <div class="timer-settings" id="timer-settings">
-              <span class="muted small">Round timers</span>
-              <div class="timer-grid">
-                <label class="timer-ctl">
-                  ✍️ Writing
+          </div>
+        </div>
+
+        <h2 class="lobby-section-title">Players</h2>
+        <div class="player-grid" id="lobby-players"></div>
+
+        <div class="lobby-bottom">
+          <div class="lobby-settings">
+            <div class="settings-card" id="persona-mode-row">
+              <h3 class="settings-title">Creator Mode</h3>
+              <p class="muted tiny">Who picks the YouTube creator name?</p>
+              <div class="toggle-row">
+                <button class="toggle-btn" id="pm-writer">✍️ Writer</button>
+                <button class="toggle-btn" id="pm-drawer">🎨 Drawer</button>
+              </div>
+            </div>
+
+            <div class="settings-card" id="timer-settings">
+              <h3 class="settings-title">Game Settings</h3>
+              <div class="settings-grid">
+                <label class="setting-ctl">
+                  <span class="setting-label">✍️ Writing</span>
                   <select id="cfg-write">
                     <option value="60">1 min</option>
                     <option value="90" selected>1.5 min</option>
@@ -100,8 +108,8 @@
                     <option value="180">3 min</option>
                   </select>
                 </label>
-                <label class="timer-ctl">
-                  🎨 Drawing
+                <label class="setting-ctl">
+                  <span class="setting-label">🎨 Drawing</span>
                   <select id="cfg-draw">
                     <option value="120">2 min</option>
                     <option value="180" selected>3 min</option>
@@ -109,8 +117,8 @@
                     <option value="300">5 min</option>
                   </select>
                 </label>
-                <label class="timer-ctl">
-                  🗳️ Voting
+                <label class="setting-ctl">
+                  <span class="setting-label">🗳️ Voting</span>
                   <select id="cfg-vote">
                     <option value="15">15 sec</option>
                     <option value="25" selected>25 sec</option>
@@ -118,8 +126,8 @@
                     <option value="60">1 min</option>
                   </select>
                 </label>
-                <label class="timer-ctl">
-                  📺 Browse
+                <label class="setting-ctl">
+                  <span class="setting-label">📺 Browse</span>
                   <select id="cfg-browse">
                     <option value="30">30 sec</option>
                     <option value="60" selected>1 min</option>
@@ -127,8 +135,8 @@
                     <option value="120">2 min</option>
                   </select>
                 </label>
-                <label class="timer-ctl">
-                  🔄 Rounds
+                <label class="setting-ctl">
+                  <span class="setting-label">🔄 Rounds</span>
                   <select id="cfg-rounds">
                     <option value="1">1 round</option>
                     <option value="2">2 rounds</option>
@@ -139,10 +147,19 @@
                 </label>
               </div>
             </div>
+
+            <div class="settings-card settings-card-spectator">
+              <label class="spectator-toggle">
+                <input type="checkbox" id="spectator" /> Spectator mode <span class="muted small">(watch only)</span>
+              </label>
+            </div>
           </div>
-          <button class="btn btn-primary btn-lg" id="start-btn">Start Game</button>
+
+          <div class="lobby-start">
+            <button class="btn btn-primary btn-xl" id="start-btn">Start Game</button>
+            <p class="muted small" id="host-hint"></p>
+          </div>
         </div>
-        <p class="muted small" id="host-hint"></p>
       </section>
     </template>
 

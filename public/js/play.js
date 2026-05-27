@@ -191,8 +191,8 @@
     const pmWriter = document.getElementById('pm-writer');
     const pmDrawer = document.getElementById('pm-drawer');
     const currentPM = state.public.config?.PERSONA_MODE || 'writer';
-    pmWriter.classList.toggle('btn-primary', currentPM === 'writer');
-    pmDrawer.classList.toggle('btn-primary', currentPM === 'drawer');
+    pmWriter.classList.toggle('active', currentPM === 'writer');
+    pmDrawer.classList.toggle('active', currentPM === 'drawer');
     if (isHost()) {
       pmWriter.onclick = () => socket.emit('set-persona-mode', { mode: 'writer' });
       pmDrawer.onclick = () => socket.emit('set-persona-mode', { mode: 'drawer' });
