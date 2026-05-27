@@ -199,7 +199,7 @@ class RoomManager {
     }
 
     const activeIds = room.round.writers;
-    room.round.assignments = buildAssignments(activeIds);
+    room.round.assignments = buildAssignments(activeIds, room.currentRound);
     room.round.drawTasks = drawTasksByPlayer(room.round.assignments);
     room.phase = PHASES.DRAWING;
     this._startTimer(room, room.config.DRAW_SECONDS, () => this._finishDrawing(room));
