@@ -7,6 +7,9 @@
   const joinError = document.getElementById('join-error');
   const resumeLink = document.getElementById('resume-link');
 
+  // Code box elements
+  const codeBoxes = joinForm.querySelectorAll('.code-box');
+
   // Show resume link if saved
   try {
     const saved = JSON.parse(localStorage.getItem('thumbwar:session') || 'null');
@@ -20,12 +23,49 @@
   const urlParams = new URLSearchParams(window.location.search);
   const presetCode = (urlParams.get('code') || '').toUpperCase();
   if (presetCode) {
-    joinForm.elements['code'].value = presetCode;
+    // Distribute the preset code across the individual boxes
+    for (let i = 0; i < codeBoxes.length; i++) {
+      codeBoxes[i].value = presetCode[i] || '';
+    }
     setTimeout(() => joinForm.elements['name'].focus(), 50);
     // Highlight the join card so first-time visitors know what to do
-    document.querySelectorAll('.card').forEach((c) => c.classList.remove('highlight'));
     const joinCard = joinForm.closest('.card');
     if (joinCard) joinCard.classList.add('highlight');
+  }
+
+  // Wire up code box auto-advance, backspace, and paste
+  codeBoxes.forEach((box, i) => {
+    box.addEventListener('input', () => {
+      const val = box.value.toUpperCase();
+      box.value = val;
+      if (val && i < codeBoxes.length - 1) {
+        codeBoxes[i + 1].focus();
+      }
+    });
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        codeBoxes[i - 1].focus();
+      }
+    });
+    box.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData.getData('text') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      for (let j = 0; j < codeBoxes.length; j++) {
+        codeBoxes[j].value = pasted[j] || '';
+      }
+      // Focus the last filled box or the next empty one
+      const nextEmpty = Array.from(codeBoxes).findIndex((b) => !b.value);
+      if (nextEmpty >= 0) {
+        codeBoxes[nextEmpty].focus();
+      } else {
+        codeBoxes[codeBoxes.length - 1].focus();
+      }
+    });
+  });
+
+  // Helper to concatenate code boxes
+  function getCodeFromBoxes() {
+    return Array.from(codeBoxes).map((b) => b.value).join('').toUpperCase();
   }
 
   function showError(msg) {
@@ -50,9 +90,9 @@
   joinForm.addEventListener('submit', (e) => {
     e.preventDefault();
     joinError.hidden = true;
-    const code = joinForm.elements['code'].value.trim().toUpperCase();
+    const code = getCodeFromBoxes();
     const name = joinForm.elements['name'].value.trim();
-    if (!code || !name) return;
+    if (!code || code.length < 4 || !name) return;
     socket.emit('join-room', { code, name }, (res) => {
       if (res.error) return showError(res.error);
       localStorage.setItem(

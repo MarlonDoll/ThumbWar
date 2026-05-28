@@ -153,14 +153,17 @@
       : `Round ${sb.roundJustFinished} / ${sb.totalRounds} Complete`;
     const board = document.getElementById('host-sb-list');
     board.innerHTML = '';
+    const deltas = sb.deltas || {};
     Object.entries(sb.scores)
       .map(([id, s]) => ({ id, s, name: nameOf(id) }))
       .sort((a, b) => b.s - a.s)
       .forEach((row, i) => {
         const li = document.createElement('li');
+        const d = deltas[row.id] || 0;
+        const deltaHtml = d > 0 ? `<span class="delta">+${d}</span>` : '';
         li.innerHTML = `<span class="rank">${i + 1}</span>
           <span class="name">${escapeHtml(row.name)}</span>
-          <span class="score">${row.s}</span>`;
+          <span class="score">${row.s} 👍${deltaHtml}</span>`;
         board.appendChild(li);
       });
   }
@@ -199,7 +202,7 @@
         const li = document.createElement('li');
         li.innerHTML = `<span class="rank">${i + 1}</span>
           <span class="name">${escapeHtml(row.name)}</span>
-          <span class="score">${row.s}</span>`;
+          <span class="score">${row.s} 👍</span>`;
         board.appendChild(li);
       });
 

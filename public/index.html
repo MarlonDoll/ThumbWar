@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;700;800;900&family=Bebas+Neue&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Archivo+Black&family=Inter:wght@400;500;700;800;900&family=Bebas+Neue&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
@@ -20,35 +20,47 @@
           <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
         </div>
         <h1 class="hero-headline">Draw the Thumb.<br><span class="hero-accent">Win the War.</span></h1>
+        <p class="landing-subtitle">Cursed thumbnails. Clickbait titles. Loudest laugh wins.</p>
       </header>
 
       <main class="landing-main">
-        <section class="card">
-          <h2>Create a room</h2>
-          <form id="create-form" class="form">
-            <label>
-              Your name
-              <input name="name" maxlength="20" required placeholder="MrBeast Jr." />
-            </label>
-            <button type="submit" class="btn btn-primary">Create Room</button>
-          </form>
-        </section>
+        <div class="landing-cards">
+          <section class="card card-pink">
+            <h2>Start a brawl</h2>
+            <p class="card-sub">Be the host. Round up the gremlins.</p>
+            <form id="create-form" class="form">
+              <label>
+                Your name
+                <input name="name" maxlength="20" required placeholder="MrBeast Jr." />
+              </label>
+              <button type="submit" class="btn btn-primary">CREATE ROOM</button>
+            </form>
+          </section>
 
-        <section class="card">
-          <h2>Join a room</h2>
-          <form id="join-form" class="form">
-            <label>
-              Room code
-              <input name="code" maxlength="4" required placeholder="ABCD" autocapitalize="characters" />
-            </label>
-            <label>
-              Your name
-              <input name="name" maxlength="20" required placeholder="Creator" />
-            </label>
-            <button type="submit" class="btn btn-primary">Join Room</button>
-          </form>
-          <p id="join-error" class="error" hidden></p>
-        </section>
+          <div class="landing-or">or</div>
+
+          <section class="card card-cyan">
+            <h2>Crash a party</h2>
+            <p class="card-sub">Got a 4-letter code? Hop in.</p>
+            <form id="join-form" class="form">
+              <label>
+                Room code
+                <div class="code-boxes">
+                  <input class="code-box" maxlength="1" data-idx="0" autocapitalize="characters" />
+                  <input class="code-box" maxlength="1" data-idx="1" autocapitalize="characters" />
+                  <input class="code-box" maxlength="1" data-idx="2" autocapitalize="characters" />
+                  <input class="code-box" maxlength="1" data-idx="3" autocapitalize="characters" />
+                </div>
+              </label>
+              <label>
+                Your name
+                <input name="name" maxlength="20" required placeholder="Creator" />
+              </label>
+              <button type="submit" class="btn btn-cyan">JOIN ROOM</button>
+            </form>
+            <p id="join-error" class="error" hidden></p>
+          </section>
+        </div>
 
         <section class="card card-muted">
           <h2>Display screen?</h2>

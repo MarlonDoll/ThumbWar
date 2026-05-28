@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;700;800;900&family=Bebas+Neue&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Archivo+Black&family=Inter:wght@400;500;700;800;900&family=Bebas+Neue&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
@@ -165,8 +165,9 @@
 
     <template id="tpl-writing">
       <section class="writing panel">
-        <h1>Write a YouTube title</h1>
-        <p class="muted">Pick a creator, then write a title a video like that would have.</p>
+        <div class="step-pill">STEP 1 / 2 · WRITE</div>
+        <h1>Write a <span class="cyan">banger</span> title</h1>
+        <p class="muted">Make a title so juicy your nan would click it.</p>
 
         <div class="write-grid">
           <div class="col">
@@ -198,6 +199,7 @@
 
     <template id="tpl-drawing">
       <section class="drawing panel">
+        <div class="step-pill">STEP 2 / 2 · DRAW</div>
         <div class="drawing-banner">
           <div>
             <span class="drawing-banner-label">🎨 You're drawing the thumbnail for:</span>
@@ -292,7 +294,7 @@
       <section class="voting panel">
         <p class="muted" id="vote-progress"></p>
         <h1 id="vote-title-row"></h1>
-        <p class="vote-question">Which video would you click?</p>
+        <p class="vote-question">Which thumb gets your click?</p>
         <div id="thumb-choices" class="vs-arena"></div>
         <p id="vote-status" class="muted"></p>
       </section>
@@ -300,7 +302,8 @@
 
     <template id="tpl-scoreboard">
       <section class="scoreboard-phase panel">
-        <h1 id="scoreboard-title">Scores</h1>
+        <p class="muted small" style="text-transform:uppercase;letter-spacing:0.12em;font-weight:700" id="scoreboard-round-label">ROUND WINNER</p>
+        <h1 id="scoreboard-title" class="shrikhand">Scores</h1>
         <p class="muted" id="scoreboard-sub"></p>
         <ol id="mid-scoreboard" class="scoreboard"></ol>
         <p class="muted small" id="scoreboard-next"></p>

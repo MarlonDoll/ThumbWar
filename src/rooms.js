@@ -411,7 +411,12 @@ class RoomManager {
       votes: r.votes,
       thumbnails: r.thumbnails
     }));
+    const prevScores = { ...scores };
     scoreMatchups(tallies, scores);
+    const deltas = {};
+    for (const id of Object.keys(scores)) {
+      deltas[id] = (scores[id] || 0) - (prevScores[id] || 0);
+    }
 
     // Accumulate this round's matchup results for cross-round stats
     room.allMatchupResults.push(...room.round.matchupResults);
@@ -420,6 +425,7 @@ class RoomManager {
     room.phase = PHASES.SCOREBOARD;
     room.scoreboard = {
       scores: { ...room.scores },
+      deltas,
       roundJustFinished: room.currentRound + 1,
       totalRounds: room.config.ROUNDS,
       isLastRound: room.currentRound >= room.config.ROUNDS - 1

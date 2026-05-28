@@ -7,6 +7,7 @@
   --border: #303030;
   --yt-red: #ff2d55;
   --yt-red-hover: #e6264c;
+  --cyan: #00e5ff;
   --accent: #3ea6ff;
   --success: #2ecc71;
   --warn: #ffb020;
@@ -1376,6 +1377,94 @@ textarea.input-xl {
   padding: 0 clamp(10px, 2vw, 32px);
   user-select: none;
   flex-shrink: 0;
+}
+
+/* ================= Visual redesign additions ================= */
+
+.cyan { color: var(--cyan); }
+.step-pill {
+  display: inline-block;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.shrikhand { font-family: 'Shrikhand', cursive; }
+
+.code-boxes { display: flex; gap: 8px; justify-content: center; }
+.code-box {
+  width: 52px; height: 56px;
+  background: #111;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+}
+.code-box:focus { border-color: var(--cyan); }
+
+.card-pink { border-color: rgba(255,45,85,0.4); box-shadow: 0 0 20px rgba(255,45,85,0.15); }
+.card-cyan { border-color: rgba(0,229,255,0.4); box-shadow: 0 0 20px rgba(0,229,255,0.15); }
+
+.btn-cyan {
+  background: var(--cyan);
+  border-color: transparent;
+  color: #001a1f;
+  font-weight: 700;
+}
+.btn-cyan:hover:not(:disabled) { background: #00c8e0; }
+
+.delta {
+  background: #1a3a1a;
+  color: #2ecc71;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+}
+
+.landing-subtitle {
+  color: var(--muted);
+  font-size: 16px;
+  margin-top: 8px;
+}
+.landing-or {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0 16px;
+}
+
+.landing-cards {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+.landing-cards > .card {
+  flex: 1;
+  min-width: 0;
+}
+.landing-cards .card h2 {
+  font-family: 'Shrikhand', cursive;
+  font-size: 24px;
+}
+.landing-cards .card .card-sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 14px;
 }
 
 /* ================= Responsive ================= */
