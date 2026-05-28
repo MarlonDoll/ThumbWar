@@ -62,14 +62,13 @@
           </section>
         </div>
 
-        <section class="card card-muted">
-          <h2>Display screen?</h2>
-          <p>Projecting on a TV or streaming? Open a shareable host view.</p>
-          <form id="host-form" class="form row">
-            <input name="code" maxlength="4" required placeholder="Room code" autocapitalize="characters" />
-            <button type="submit" class="btn btn-ghost">Open Display</button>
+        <div class="display-link-row">
+          <form id="host-form" class="display-link-form">
+            <span class="muted small">📺 Display screen?</span>
+            <input name="code" maxlength="4" required placeholder="Code" autocapitalize="characters" class="display-link-input" />
+            <button type="submit" class="btn btn-ghost btn-sm">Open</button>
           </form>
-        </section>
+        </div>
       </main>
 
       <footer class="landing-footer">

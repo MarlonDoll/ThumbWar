@@ -234,6 +234,36 @@ button {
   font-size: 14px;
 }
 
+.display-link-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+.display-link-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 6px 8px 6px 16px;
+}
+.display-link-input {
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 14px;
+  width: 60px;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+}
+.display-link-input:focus {
+  border-color: var(--cyan);
+}
+
 .landing-footer {
   margin-top: auto;
   padding-top: 30px;
