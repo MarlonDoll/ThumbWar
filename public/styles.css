@@ -1396,6 +1396,7 @@ textarea.input-xl {
   margin-bottom: 12px;
 }
 .shrikhand { font-family: 'Shrikhand', cursive; }
+.caveat { font-family: 'Caveat', cursive; }
 
 .code-boxes { display: flex; gap: 8px; justify-content: center; }
 .code-box {
@@ -1435,7 +1436,7 @@ textarea.input-xl {
 
 .landing-subtitle {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 20px;
   margin-top: 8px;
 }
 .landing-or {
@@ -1452,10 +1453,12 @@ textarea.input-xl {
   display: flex;
   gap: 0;
   align-items: stretch;
+  justify-content: center;
 }
 .landing-cards > .card {
   flex: 1;
   min-width: 0;
+  max-width: 340px;
 }
 .landing-cards .card h2 {
   font-family: 'Shrikhand', cursive;
@@ -1463,7 +1466,7 @@ textarea.input-xl {
 }
 .landing-cards .card .card-sub {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 18px;
   margin-bottom: 14px;
 }
 
