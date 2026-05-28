@@ -166,24 +166,24 @@
     <template id="tpl-writing">
       <section class="writing panel">
         <div class="step-pill">STEP 1 / 2 · WRITE</div>
-        <h1>Write a <span class="cyan">banger</span> title</h1>
-        <p class="muted">Make a title so juicy your nan would click it.</p>
+        <h1 class="phase-headline">WRITE A <span class="highlight-cyan">BANGER</span> TITLE</h1>
+        <p class="phase-sub caveat">...the kind your nan would 100% click on.</p>
 
         <div class="write-grid">
           <div class="col">
             <h3>Your creator</h3>
             <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Cult Leader" />
-            <p class="muted tiny">Or pick a suggestion:</p>
+            <p class="caveat" style="color:var(--muted);font-size:16px">Or pick a suggestion:</p>
             <div id="persona-suggestions" class="chip-wrap"></div>
           </div>
 
           <div class="col">
             <h3>Your title</h3>
             <textarea id="title-input" class="input-xl" maxlength="120" placeholder="I Survived 30 Days Living Like a Toddler"></textarea>
-            <p class="muted tiny">Tip: replace the [X] / [Y] blanks with your own words.</p>
+            <p class="caveat" style="color:var(--muted);font-size:16px">Tip: replace the [X] / [Y] blanks with your own words.</p>
 
             <h3>Need inspiration?</h3>
-            <p class="muted tiny">Tap a format and the blanks become part of your title.</p>
+            <p class="caveat" style="color:var(--muted);font-size:16px">Tap a format and the blanks become part of your title.</p>
             <div id="format-suggestions" class="format-wrap"></div>
           </div>
         </div>
@@ -276,7 +276,7 @@
             <span class="creator-callout-icon">🎬</span>
             <div>
               <strong>Who's the YouTube creator?</strong>
-              <span class="muted small">This appears as the channel name under your thumbnail. Use your name, a celebrity, or a character.</span>
+              <span class="caveat" style="font-size:17px;color:var(--muted)">This appears as the channel name under your thumbnail. Use your name, a celebrity, or a character.</span>
             </div>
           </div>
           <input id="drawer-persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Ninja" />
@@ -294,7 +294,7 @@
       <section class="voting panel">
         <p class="muted" id="vote-progress"></p>
         <h1 id="vote-title-row"></h1>
-        <p class="vote-question">Which thumb gets your click?</p>
+        <p class="vote-question caveat">Which thumb gets your click?</p>
         <div id="thumb-choices" class="vs-arena"></div>
         <p id="vote-status" class="muted"></p>
       </section>
@@ -312,15 +312,15 @@
 
     <template id="tpl-browse">
       <section class="browse panel">
-        <h1>📺 The Browse Page</h1>
+        <h1 class="phase-headline">📺 THE BROWSE PAGE</h1>
 
         <h2 id="browse-thumb-header">🎨 Best Thumbnail</h2>
-        <p class="muted">Which thumbnail would make you click? (Can't pick your own art)</p>
+        <p class="phase-sub caveat">Which thumbnail would make you click? (Can't pick your own art)</p>
         <div id="browse-thumb-grid" class="browse-grid"></div>
         <p id="browse-thumb-status" class="muted"></p>
 
         <h2 id="browse-title-header">✍️ Best Title Idea</h2>
-        <p class="muted">Which video title is the most clickable? (Can't pick your own title)</p>
+        <p class="phase-sub caveat">Which video title is the most clickable? (Can't pick your own title)</p>
         <div id="browse-title-grid" class="browse-grid"></div>
         <p id="browse-title-status" class="muted"></p>
       </section>
@@ -328,7 +328,7 @@
 
     <template id="tpl-results">
       <section class="results panel">
-        <h1 id="champion-headline">🏆 ThumbWar Champion</h1>
+        <h1 id="champion-headline" class="phase-headline">🏆 THUMBWAR CHAMPION</h1>
         <div id="champion-card" class="champion-card"></div>
         <h2>Final Scores</h2>
         <ol id="scoreboard" class="scoreboard"></ol>

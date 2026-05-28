@@ -309,6 +309,19 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* Phase headings */
+.phase-headline {
+  font-size: clamp(28px, 4.5vw, 44px);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 6px;
+}
+.phase-sub {
+  font-size: 20px;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
 /* Lobby */
 .lobby-hero {
   text-align: center;
@@ -934,7 +947,7 @@ textarea.input-xl {
 .vote-question {
   color: var(--yt-red);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 24px;
   margin: 16px 0;
 }
 .vs-arena {
@@ -1382,6 +1395,13 @@ textarea.input-xl {
 /* ================= Visual redesign additions ================= */
 
 .cyan { color: var(--cyan); }
+.highlight-cyan {
+  color: var(--text);
+  background: var(--cyan);
+  padding: 0 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
 .step-pill {
   display: inline-block;
   background: var(--surface-2);
