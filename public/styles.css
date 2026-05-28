@@ -1506,10 +1506,8 @@ textarea.input-xl {
   justify-content: center;
 }
 .landing-cards > .card {
-  flex: 1;
+  flex: 0 1 360px;
   min-width: 0;
-  max-width: 340px;
-  text-align: center;
 }
 .landing-cards .card h2 {
   font-family: 'Shrikhand', cursive;
@@ -1519,13 +1517,6 @@ textarea.input-xl {
   color: var(--muted);
   font-size: 18px;
   margin-bottom: 14px;
-}
-.landing-cards .card .form {
-  align-items: center;
-}
-.landing-cards .card .form label {
-  width: 100%;
-  text-align: left;
 }
 .landing-cards .card .form .btn {
   width: 100%;
