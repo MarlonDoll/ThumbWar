@@ -740,22 +740,27 @@
     const concepts = (state.public.browse && state.public.browse.concepts) || [];
     const votedBy = state.public.browse.votedBy || {};
 
-    // Best Thumbnail grid
+    // Best Thumbnail grid — every individual thumbnail is votable
     const thumbGrid = document.getElementById('browse-thumb-grid');
     thumbGrid.innerHTML = '';
     const thumbVoted = (votedBy.bestThumb || []).includes(state.playerId);
+    const allThumbs = [];
     concepts.forEach((c) => {
-      const isMyArt = c.artistId === state.playerId;
+      const thumbs = c.allThumbnails || (c.thumbnail ? [c.thumbnail] : []);
+      thumbs.forEach((t) => allThumbs.push({ t, c }));
+    });
+    allThumbs.forEach(({ t, c }) => {
+      const isMyArt = t.artistId === state.playerId;
       const card = document.createElement('div');
       card.className = 'browse-card' + (isMyArt ? ' browse-card-mine' : '');
       card.innerHTML = `
-        ${c.thumbnail ? `<img src="${c.thumbnail.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
+        ${t.png ? `<img src="${t.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
         ${isMyArt ? '<div class="browse-yours">Your art</div>' : ''}
       `;
       if (!isMyArt) {
         card.onclick = () => {
-          socket.emit('submit-browse-vote', { category: 'bestThumb', conceptId: c.id }, (res) => {
+          socket.emit('submit-browse-vote', { category: 'bestThumb', conceptId: t.id }, (res) => {
             if (res && res.error) return showToast(res.error);
             showToast('Voted for Best Thumbnail!');
           });
@@ -834,15 +839,29 @@
     for (const { key, label, showThumb } of awardDefs) {
       const data = r.awardResults?.[key];
       if (!data || !data.winners || data.winners.length === 0) continue;
-      const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
+      const winnerId = data.winners[0];
+      let concept = null;
+      let winningThumb = null;
+      if (key === 'bestThumb') {
+        // winnerId is a thumbnailId — find the concept that has it
+        for (const c of r.concepts || []) {
+          const t = (c.allThumbnails || []).find((x) => x.id === winnerId);
+          if (t) { concept = c; winningThumb = t; break; }
+        }
+      } else {
+        concept = (r.concepts || []).find((c) => c.id === winnerId);
+        winningThumb = concept?.thumbnail;
+      }
       if (!concept) continue;
+      const artistId = winningThumb?.artistId || concept.artistId;
+      const thumbPng = winningThumb?.png || concept.thumbnail?.png;
       const card = document.createElement('div');
       card.className = 'award-card';
       card.innerHTML = `
         <h3>${label}</h3>
-        ${showThumb && concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
+        ${showThumb && thumbPng ? `<img src="${thumbPng}" alt="" />` : ''}
         <p class="award-title">${escapeHtml(concept.title.title)}</p>
-        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
+        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${artistId ? ` · art by ${escapeHtml(nameOf(artistId))}` : ''}</p>
       `;
       awards.appendChild(card);
     }
@@ -890,6 +909,39 @@
 
   // ----- timer -----
 
+  // Soft tick sound when drawing/writing time is running low.
+  let audioCtx = null;
+  function playTick(urgent) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = urgent ? 900 : 700;
+      gain.gain.value = 0;
+      gain.gain.linearRampToValueAtTime(urgent ? 0.07 : 0.04, audioCtx.currentTime + 0.01);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } catch {}
+  }
+  let lastTickSecond = -1;
+  function maybeTick(remaining, phase) {
+    if (phase !== 'drawing' && phase !== 'writing') {
+      lastTickSecond = -1;
+      return;
+    }
+    if (remaining > 10 || remaining <= 0) {
+      lastTickSecond = remaining;
+      return;
+    }
+    if (remaining !== lastTickSecond) {
+      lastTickSecond = remaining;
+      playTick(remaining <= 3);
+    }
+  }
+
   function updateTimer() {
     if (!state.public || !state.public.timerEndsAt) {
       timerPill.hidden = true;
@@ -903,6 +955,7 @@
       : '';
     timerPill.textContent = roundPrefix + formatTime(remaining);
     timerPill.classList.toggle('urgent', remaining <= 10);
+    maybeTick(remaining, state.public.phase);
   }
 
   function formatTime(sec) {

@@ -62,14 +62,14 @@ function scoreMatchups(voteTallies, scores) {
   }
 }
 
-// awardTallies: { funniest: { [conceptId]: count }, clickbait: {...}, interesting: {...} }
-// concepts: [{ id, writerId, artistId }]
+// awardTallies: { bestTitle: { [conceptId]: count }, bestThumb: { [thumbnailId]: count } }
+// concepts: [{ id, writerId, artistId, allThumbnails: [{id, artistId}] }]
 function scoreAwards(awardTallies, concepts, scores) {
   const results = {};
   for (const key of Object.keys(awardTallies)) {
     const votes = awardTallies[key];
     const sorted = Object.keys(votes)
-      .map((cid) => ({ cid, v: votes[cid] }))
+      .map((id) => ({ id, v: votes[id] }))
       .filter((r) => r.v > 0)
       .sort((a, b) => b.v - a.v);
     if (sorted.length === 0) {
@@ -78,24 +78,42 @@ function scoreAwards(awardTallies, concepts, scores) {
     }
     const topVotes = sorted[0].v;
     const winners = sorted.filter((r) => r.v === topVotes);
+
+    const findOwners = (targetId) => {
+      if (key === 'bestThumb') {
+        for (const c of concepts) {
+          const t = (c.allThumbnails || []).find((x) => x.id === targetId);
+          if (t) return { writerId: c.writerId, artistId: t.artistId, conceptId: c.id };
+        }
+        return null;
+      }
+      // bestTitle votes by conceptId
+      const c = concepts.find((x) => x.id === targetId);
+      if (!c) return null;
+      return { writerId: c.writerId, artistId: c.artistId, conceptId: c.id };
+    };
+
     for (const w of winners) {
-      const c = concepts.find((x) => x.id === w.cid);
-      if (!c) continue;
-      scores[c.writerId] =
-        (scores[c.writerId] || 0) + POINTS.ENDGAME_AWARD_WIN;
-      if (c.artistId && c.artistId !== c.writerId) {
-        scores[c.artistId] =
-          (scores[c.artistId] || 0) + Math.round(POINTS.ENDGAME_AWARD_WIN / 2);
+      const owners = findOwners(w.id);
+      if (!owners) continue;
+      if (key === 'bestThumb') {
+        // Artist of the winning thumbnail gets the award
+        scores[owners.artistId] =
+          (scores[owners.artistId] || 0) + POINTS.ENDGAME_AWARD_WIN;
+      } else {
+        // Title writer gets the award; sometimes credit the artist too
+        scores[owners.writerId] =
+          (scores[owners.writerId] || 0) + POINTS.ENDGAME_AWARD_WIN;
       }
     }
     const runnerUps = sorted.filter((r) => r.v < topVotes).slice(0, 1);
     for (const r of runnerUps) {
-      const c = concepts.find((x) => x.id === r.cid);
-      if (!c) continue;
-      scores[c.writerId] =
-        (scores[c.writerId] || 0) + POINTS.ENDGAME_AWARD_RUNNER_UP;
+      const owners = findOwners(r.id);
+      if (!owners) continue;
+      const credit = key === 'bestThumb' ? owners.artistId : owners.writerId;
+      scores[credit] = (scores[credit] || 0) + POINTS.ENDGAME_AWARD_RUNNER_UP;
     }
-    results[key] = { winners: winners.map((w) => w.cid), tallies: votes };
+    results[key] = { winners: winners.map((w) => w.id), tallies: votes };
   }
   return results;
 }

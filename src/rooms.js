@@ -473,7 +473,7 @@ class RoomManager {
     this._startTimer(room, room.config.BROWSE_SECONDS, () => this._finishBrowse(room));
   }
 
-  submitBrowseVote(room, playerId, category, conceptId) {
+  submitBrowseVote(room, playerId, category, targetId) {
     if (room.phase !== PHASES.BROWSE) return { error: 'Not in browse phase' };
     if (!room.browse.votes[category]) return { error: 'Unknown category' };
     if (room.browse.votedBy[category].has(playerId)) {
@@ -482,19 +482,30 @@ class RoomManager {
         room.browse.votes[category][prev] = Math.max(0, (room.browse.votes[category][prev] || 0) - 1);
       }
     }
-    const concept = room.browse.concepts.find((c) => c.id === conceptId);
-    if (!concept) return { error: 'Unknown concept' };
-    if (category === 'bestThumb' && concept.artistId === playerId) {
-      return { error: 'You can\'t vote for your own thumbnail' };
+    if (category === 'bestThumb') {
+      // Vote is per-thumbnail. Find the thumbnail across all concepts.
+      let foundThumb = null;
+      let foundConcept = null;
+      for (const c of room.browse.concepts) {
+        const t = (c.allThumbnails || []).find((x) => x.id === targetId);
+        if (t) { foundThumb = t; foundConcept = c; break; }
+      }
+      if (!foundThumb) return { error: 'Unknown thumbnail' };
+      if (foundThumb.artistId === playerId) {
+        return { error: 'You can\'t vote for your own thumbnail' };
+      }
+    } else if (category === 'bestTitle') {
+      const concept = room.browse.concepts.find((c) => c.id === targetId);
+      if (!concept) return { error: 'Unknown concept' };
+      if (concept.writerId === playerId) {
+        return { error: 'You can\'t vote for your own title' };
+      }
     }
-    if (category === 'bestTitle' && concept.writerId === playerId) {
-      return { error: 'You can\'t vote for your own title' };
-    }
-    room.browse.votes[category][conceptId] =
-      (room.browse.votes[category][conceptId] || 0) + 1;
+    room.browse.votes[category][targetId] =
+      (room.browse.votes[category][targetId] || 0) + 1;
     room.browse.votedBy[category].add(playerId);
     room.browse.votedByChoice = room.browse.votedByChoice || { bestThumb: {}, bestTitle: {} };
-    room.browse.votedByChoice[category][playerId] = conceptId;
+    room.browse.votedByChoice[category][playerId] = targetId;
 
     const active = this._connectedActive(room);
     const allDone = ['bestThumb', 'bestTitle'].every((cat) =>
@@ -515,7 +526,8 @@ class RoomManager {
       room.browse.concepts.map((c) => ({
         id: c.id,
         writerId: c.writerId,
-        artistId: c.artistId
+        artistId: c.artistId,
+        allThumbnails: c.allThumbnails || []
       })),
       scores
     );
@@ -730,7 +742,13 @@ class RoomManager {
           writerId: c.writerId,
           artistId: c.artistId,
           title: c.title,
-          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null
+          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null,
+          allThumbnails: (c.allThumbnails || []).map((t) => ({
+            id: t.id,
+            artistId: t.artistId,
+            png: t.png,
+            persona: t.persona || null
+          }))
         })),
         votedBy: {
           bestThumb: [...room.browse.votedBy.bestThumb],

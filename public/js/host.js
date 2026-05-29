@@ -214,15 +214,28 @@
     for (const { key, label, showThumb } of awardDefs) {
       const data = r.awardResults?.[key];
       if (!data || !data.winners || data.winners.length === 0) continue;
-      const concept = (r.concepts || []).find((c) => c.id === data.winners[0]);
+      const winnerId = data.winners[0];
+      let concept = null;
+      let winningThumb = null;
+      if (key === 'bestThumb') {
+        for (const c of r.concepts || []) {
+          const t = (c.allThumbnails || []).find((x) => x.id === winnerId);
+          if (t) { concept = c; winningThumb = t; break; }
+        }
+      } else {
+        concept = (r.concepts || []).find((c) => c.id === winnerId);
+        winningThumb = concept?.thumbnail;
+      }
       if (!concept) continue;
+      const artistId = winningThumb?.artistId || concept.artistId;
+      const thumbPng = winningThumb?.png || concept.thumbnail?.png;
       const card = document.createElement('div');
       card.className = 'award-card';
       card.innerHTML = `
         <h3>${label}</h3>
-        ${showThumb && concept.thumbnail ? `<img src="${concept.thumbnail.png}" alt="" />` : ''}
+        ${showThumb && thumbPng ? `<img src="${thumbPng}" alt="" />` : ''}
         <p class="award-title">${escapeHtml(concept.title.title)}</p>
-        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${concept.artistId ? ` · art by ${escapeHtml(nameOf(concept.artistId))}` : ''}</p>
+        <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${artistId ? ` · art by ${escapeHtml(nameOf(artistId))}` : ''}</p>
       `;
       awards.appendChild(card);
     }

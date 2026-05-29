@@ -1,11 +1,41 @@
 (function () {
   const socket = io();
 
+  // Featured concepts on the home page. Drop image files into
+  // /public/images/featured/ and add an entry here for each.
+  // Each card needs: { file, title, creator, winner }
+  const FEATURED = [
+    // Example shape — uncomment and replace once images are uploaded:
+    // { file: 'mybeast-1.png', title: 'I Survived 24 Hours in IKEA', creator: 'MrBeast', winner: 'jpeg_jerry' },
+  ];
+
   const createForm = document.getElementById('create-form');
   const joinForm = document.getElementById('join-form');
   const hostForm = document.getElementById('host-form');
   const joinError = document.getElementById('join-error');
   const resumeLink = document.getElementById('resume-link');
+
+  // Render featured grid
+  const featuredGrid = document.getElementById('featured-grid');
+  const featuredSection = document.querySelector('.featured-section');
+  if (featuredGrid) {
+    if (FEATURED.length === 0 && featuredSection) {
+      featuredSection.hidden = true;
+    }
+    for (const f of FEATURED) {
+      const card = document.createElement('div');
+      card.className = 'featured-card';
+      card.innerHTML = `
+        <img src="/images/featured/${f.file}" alt="${f.title}" />
+        <div class="featured-meta">
+          <div class="featured-card-title">${f.title}</div>
+          <div class="featured-card-creator">${f.creator}</div>
+          ${f.winner ? `<div class="featured-card-winner">drawn by ${f.winner}</div>` : ''}
+        </div>
+      `;
+      featuredGrid.appendChild(card);
+    }
+  }
 
   // Code box elements
   const codeBoxes = joinForm.querySelectorAll('.code-box');
