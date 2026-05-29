@@ -5,8 +5,10 @@
   // /public/images/featured/ and add an entry here for each.
   // Each card needs: { file, title, creator, winner }
   const FEATURED = [
-    // Example shape — uncomment and replace once images are uploaded:
-    // { file: 'mybeast-1.png', title: 'I Survived 24 Hours in IKEA', creator: 'MrBeast', winner: 'jpeg_jerry' },
+    { file: 'zombies.png', title: 'I make the perfect machine to stop Zombies', creator: 'Stephen', winner: 'nick' },
+    { file: 'cult.png', title: 'How I infiltrated a cult', creator: 'Stephen', winner: 'nick' },
+    { file: 'god.png', title: 'I Lived like God for a Day', creator: 'Marlon', winner: 'The Yoan' },
+    { file: 'tamigotchi.png', title: 'I Let My Tamigotchi Control My Life', creator: 'Marlon', winner: 'nick' }
   ];
 
   const createForm = document.getElementById('create-form');
