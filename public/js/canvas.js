@@ -97,6 +97,7 @@
     }
 
     _onDown(e) {
+      if (this._textDragActive) return;
       e.preventDefault();
       const { x, y } = this._coords(e);
       this.startX = x;
@@ -119,17 +120,7 @@
             opacity: this.opacity,
             onConfirm: ({ text, size, color, font, bold }) => {
               if (!text) return;
-              const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
-              this.color = color;
-              this.textSize = size;
-              this.textFont = font || 'Impact';
-              this.textBold = bold !== false;
-              this._drawText(x, y, text);
-              this._pushUndo();
-              this.color = prev.color;
-              this.textSize = prev.size;
-              this.textFont = prev.font;
-              this.textBold = prev.bold;
+              this._startTextDrag({ text, size, color, font, bold, x, y });
             }
           });
         } else {
@@ -258,6 +249,66 @@
       ctx.lineTo(x2 - wingX - sideX, y2 - wingY - sideY);
       ctx.closePath();
       ctx.fill();
+    }
+
+    // Start drag-to-place mode for newly added text. The text follows
+    // the pointer until the user clicks/taps to commit it.
+    _startTextDrag(opts) {
+      const snapshot = this.ctx.getImageData(0, 0, this.width, this.height);
+      let cx = opts.x;
+      let cy = opts.y;
+
+      const draw = (x, y) => {
+        this.ctx.putImageData(snapshot, 0, 0);
+        const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
+        this.color = opts.color;
+        this.textSize = opts.size;
+        this.textFont = opts.font || 'Impact';
+        this.textBold = opts.bold !== false;
+        this._drawText(x, y, opts.text);
+        this.color = prev.color;
+        this.textSize = prev.size;
+        this.textFont = prev.font;
+        this.textBold = prev.bold;
+      };
+
+      draw(cx, cy);
+
+      const onMove = (e) => {
+        const { x, y } = this._coords(e);
+        cx = x;
+        cy = y;
+        draw(x, y);
+      };
+      const onDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const { x, y } = this._coords(e);
+        draw(x, y);
+        cleanup();
+        this._pushUndo();
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') {
+          this.ctx.putImageData(snapshot, 0, 0);
+          cleanup();
+        } else if (e.key === 'Enter') {
+          cleanup();
+          this._pushUndo();
+        }
+      };
+
+      const cleanup = () => {
+        this.canvas.removeEventListener('pointermove', onMove);
+        this.canvas.removeEventListener('pointerdown', onDown);
+        document.removeEventListener('keydown', onKey);
+        this._textDragActive = false;
+      };
+
+      this._textDragActive = true;
+      this.canvas.addEventListener('pointermove', onMove);
+      this.canvas.addEventListener('pointerdown', onDown);
+      document.addEventListener('keydown', onKey);
     }
 
     _drawText(x, y, text) {

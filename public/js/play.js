@@ -211,7 +211,7 @@
       setVal('cfg-write', cfg.WRITE_SECONDS || 90);
       setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
       setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
-      setVal('cfg-browse', cfg.BROWSE_SECONDS || 60);
+      setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
 
       const sendTimers = () => {

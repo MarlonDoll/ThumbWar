@@ -18,7 +18,7 @@ const DEFAULTS = {
   WRITE_SECONDS: 90,
   DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
-  BROWSE_SECONDS: 60,
+  BROWSE_SECONDS: 30,
   PERSONA_MODE: 'drawer', // 'writer' | 'drawer'
   ROUNDS: 3
 };
@@ -299,15 +299,19 @@ class RoomManager {
     delete m.results;
     // Solo mode: 1 thumbnail, no vote needed — flash the reveal briefly.
     if (m.thumbnails.length <= 1) {
-      // Auto-advance after a short reveal delay.
       this._clearTimer(room);
       room.timerEndsAt = Date.now() + 3000;
       room.timerHandle = setTimeout(() => this._advanceMatchup(room), 3000);
+      this._broadcastAll(room);
       return;
     }
     this._startTimer(room, room.config.VOTE_SECONDS, () =>
       this._advanceMatchup(room)
     );
+    // Broadcast immediately so the client sees the new matchup + timer.
+    // Without this, the client stays on the previous matchup's expired
+    // timer until someone votes or the next timer fires.
+    this._broadcastAll(room);
   }
 
   submitVote(room, playerId, thumbnailId) {

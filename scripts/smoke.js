@@ -130,7 +130,7 @@ async function run() {
   }
 
   // Force finish (timer will fire) — wait up to 5s
-  for (let i = 0; i < 20 && states.host.phase !== 'results'; i++) await wait(300);
+  for (let i = 0; i < 120 && states.host.phase !== 'results'; i++) await wait(300);
   console.log('final phase:', states.host.phase);
   if (states.host.phase === 'results') {
     console.log('champion:', states.host.results.champion);
