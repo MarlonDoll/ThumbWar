@@ -216,7 +216,7 @@
           <div class="tool-group">
             <button data-tool="pen" class="tool active" title="Pen">✏️</button>
             <button data-tool="eraser" class="tool" title="Eraser">🧽</button>
-            <button data-tool="fill" class="tool" title="Fill">🪣</button>
+            <button data-tool="fill" class="tool" title="Fill"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 11.5s-2 2.17-2 3.5a2 2 0 0 0 4 0c0-1.33-2-3.5-2-3.5zM5.21 10L10 5.21l4.79 4.79H5.21M16.56 8.94L7.62 0L6.21 1.41l2.38 2.38L3.44 8.94c-.58.58-.58 1.53 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.58-.59.58-1.54 0-2.12z"/></svg></button>
             <button data-tool="line" class="tool" title="Line">／</button>
             <button data-tool="rect" class="tool" title="Rectangle">▭</button>
             <button data-tool="circle" class="tool" title="Circle">◯</button>
@@ -226,7 +226,7 @@
 
           <div class="tool-group">
             <label class="ctl">
-              Size
+              Size <span class="size-preview" id="size-preview"></span>
               <input type="range" id="size" min="1" max="80" value="6" />
             </label>
             <label class="ctl">

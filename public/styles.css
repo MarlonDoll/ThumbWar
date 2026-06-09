@@ -1491,6 +1491,16 @@ textarea.input-xl {
 /* ================= Visual redesign additions ================= */
 
 .cyan { color: var(--cyan); }
+.size-preview {
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--text);
+  margin-left: 6px;
+  transition: width 0.1s, height 0.1s;
+  min-width: 2px;
+  min-height: 2px;
+}
 .highlight-cyan {
   color: var(--text);
   background: var(--cyan);

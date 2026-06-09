@@ -75,7 +75,7 @@
     const cancel = document.getElementById('text-modal-cancel');
     const confirm = document.getElementById('text-modal-confirm');
     let pendingConfirm = null;
-    let isBold = true;
+    let isBold = false;
 
     function refreshPreview() {
       preview.textContent = input.value || 'YOUR THUMBNAIL TEXT';
@@ -121,7 +121,7 @@
       sizeIn.value = size || 64;
       colorIn.value = color || '#ffd400';
       fontIn.value = 'Impact';
-      isBold = true;
+      isBold = false;
       pendingConfirm = onConfirm;
       modal.hidden = false;
       refreshPreview();
@@ -570,6 +570,8 @@
         canvas.color = color;
         document.getElementById('custom-color').value = color;
         updateSwatchSelection(color);
+        const sp = document.getElementById('size-preview');
+        if (sp) sp.style.background = color;
       };
       b.dataset.color = color;
       palette.appendChild(b);
@@ -591,9 +593,22 @@
         canvas.tool = btn.dataset.tool;
       };
     });
-    document.getElementById('size').oninput = (e) => {
+    const sizeInput = document.getElementById('size');
+    const sizePreview = document.getElementById('size-preview');
+    function refreshSizePreview() {
+      if (!sizePreview) return;
+      const v = parseInt(sizeInput.value, 10);
+      // Cap visual at 32px so the toolbar doesn't blow up
+      const display = Math.min(32, Math.max(2, v));
+      sizePreview.style.width = display + 'px';
+      sizePreview.style.height = display + 'px';
+      sizePreview.style.background = canvas.color;
+    }
+    sizeInput.oninput = (e) => {
       canvas.size = parseInt(e.target.value, 10);
+      refreshSizePreview();
     };
+    refreshSizePreview();
     document.getElementById('text-size').oninput = (e) => {
       canvas.textSize = parseInt(e.target.value, 10);
     };
@@ -603,6 +618,7 @@
     document.getElementById('custom-color').oninput = (e) => {
       canvas.color = e.target.value;
       updateSwatchSelection(canvas.color);
+      refreshSizePreview();
     };
     document.getElementById('undo').onclick = () => canvas.undo();
     document.getElementById('redo').onclick = () => canvas.redo();
