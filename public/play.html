@@ -102,18 +102,18 @@
                 <label class="setting-ctl">
                   <span class="setting-label">✍️ Writing</span>
                   <select id="cfg-write">
+                    <option value="30">30 sec</option>
+                    <option value="45" selected>45 sec</option>
                     <option value="60">1 min</option>
-                    <option value="90" selected>1.5 min</option>
-                    <option value="120">2 min</option>
-                    <option value="180">3 min</option>
+                    <option value="90">1.5 min</option>
                   </select>
                 </label>
                 <label class="setting-ctl">
                   <span class="setting-label">🎨 Drawing</span>
                   <select id="cfg-draw">
                     <option value="120">2 min</option>
-                    <option value="180" selected>3 min</option>
-                    <option value="240">4 min</option>
+                    <option value="180">3 min</option>
+                    <option value="240" selected>4 min</option>
                     <option value="300">5 min</option>
                   </select>
                 </label>
@@ -214,14 +214,24 @@
 
         <div class="toolbar" id="toolbar">
           <div class="tool-group">
-            <button data-tool="pen" class="tool active" title="Pen">✏️</button>
-            <button data-tool="eraser" class="tool" title="Eraser">🧽</button>
-            <button data-tool="fill" class="tool" title="Fill"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 11.5s-2 2.17-2 3.5a2 2 0 0 0 4 0c0-1.33-2-3.5-2-3.5zM5.21 10L10 5.21l4.79 4.79H5.21M16.56 8.94L7.62 0L6.21 1.41l2.38 2.38L3.44 8.94c-.58.58-.58 1.53 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.58-.59.58-1.54 0-2.12z"/></svg></button>
-            <button data-tool="line" class="tool" title="Line">／</button>
-            <button data-tool="rect" class="tool" title="Rectangle">▭</button>
-            <button data-tool="circle" class="tool" title="Circle">◯</button>
-            <button data-tool="arrow" class="tool" title="Arrow">➜</button>
-            <button data-tool="text" class="tool" title="Text">T</button>
+            <button data-tool="pen" class="tool active" title="Pen (P)">✏️</button>
+            <button data-tool="eraser" class="tool" title="Eraser (E)">🧽</button>
+            <button data-tool="fill" class="tool" title="Fill (F)"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.56 8.94 8.32.7a1 1 0 0 0-1.41 0l-1.4 1.41 2.12 2.12-4.95 4.95a1.5 1.5 0 0 0 0 2.12l5.66 5.66a1.5 1.5 0 0 0 2.12 0l5.1-5.1a1.5 1.5 0 0 0 0-2.12l-.99-.8ZM7.05 6.34l4.24 4.24H4.93l2.12-2.12v-2.12Zm12.95 6.16s-2 2.17-2 3.5a2 2 0 1 0 4 0c0-1.33-2-3.5-2-3.5Z"/></svg></button>
+            <button data-tool="line" class="tool" title="Line (L)">／</button>
+            <button data-tool="rect" class="tool" title="Rectangle (R)">▭</button>
+            <button data-tool="circle" class="tool" title="Circle (C)">◯</button>
+            <button data-tool="arrow" class="tool" title="Arrow (A)">➜</button>
+            <button data-tool="text" class="tool" title="Text (T)">T</button>
+          </div>
+
+          <div class="tool-group stickers" id="stickers">
+            <span class="tool-group-label">Stickers</span>
+            <button class="sticker-btn" data-sticker="➡️" title="Arrow">➡️</button>
+            <button class="sticker-btn" data-sticker="⭐" title="Star">⭐</button>
+            <button class="sticker-btn" data-sticker="🔥" title="Fire">🔥</button>
+            <button class="sticker-btn" data-sticker="💯" title="100">💯</button>
+            <button class="sticker-btn" data-sticker="😱" title="Shock">😱</button>
+            <button class="sticker-btn" data-sticker="❗" title="Exclaim">❗</button>
           </div>
 
           <div class="tool-group">
@@ -241,20 +251,26 @@
 
           <div class="tool-group">
             <div id="palette" class="palette"></div>
-            <label class="ctl">
+            <label class="custom-color-wrap" title="Custom color">
+              <span class="custom-color-plus">+</span>
               <input type="color" id="custom-color" value="#000000" />
             </label>
           </div>
 
           <div class="tool-group">
-            <button class="btn btn-ghost btn-sm" id="undo">Undo</button>
-            <button class="btn btn-ghost btn-sm" id="redo">Redo</button>
+            <button class="btn btn-ghost btn-sm" id="undo" title="Undo (Ctrl+Z)">Undo</button>
+            <button class="btn btn-ghost btn-sm" id="redo" title="Redo (Ctrl+Y)">Redo</button>
             <button class="btn btn-ghost btn-sm" id="clear">Clear</button>
           </div>
         </div>
 
         <div class="canvas-shell">
           <canvas id="thumb" width="1280" height="720"></canvas>
+          <div class="place-banner" id="place-banner" hidden>
+            <span>Drag to position · </span>
+            <button class="btn btn-primary btn-sm" id="place-confirm">Place</button>
+            <button class="btn btn-ghost btn-sm" id="place-cancel">Cancel</button>
+          </div>
         </div>
 
         <div class="yt-card">

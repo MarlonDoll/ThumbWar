@@ -983,11 +983,13 @@ textarea.input-xl {
 
 .palette {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
+  max-width: 360px;
 }
 .swatch {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid #444;
   cursor: pointer;
@@ -998,11 +1000,108 @@ textarea.input-xl {
   box-shadow: 0 0 0 2px var(--yt-red);
 }
 
+/* Clear, obvious custom-color picker */
+.custom-color-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: conic-gradient(red, orange, yellow, lime, cyan, blue, magenta, red);
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.custom-color-plus {
+  position: absolute;
+  font-weight: 900;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+  pointer-events: none;
+}
+.custom-color-wrap input[type="color"] {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  cursor: pointer;
+}
+
+/* Sticker quick-stamps */
+.tool-group.stickers {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.tool-group-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tool-group.stickers > div, .stickers-row { display: flex; gap: 4px; }
+.sticker-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.sticker-btn:hover { border-color: var(--yt-red); }
+
 .canvas-shell {
+  position: relative;
   background: #000;
   border-radius: 10px;
   padding: 6px;
   border: 1px solid var(--border);
+}
+/* Place / cancel banner during text + sticker placement */
+.place-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.82);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: 99px;
+  z-index: 6;
+  font-size: 14px;
+}
+.place-banner[hidden] { display: none; }
+
+/* Big end-of-phase countdown flash */
+.countdown-flash {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(120px, 26vw, 320px);
+  color: var(--yt-red);
+  text-shadow: 0 8px 40px rgba(255,45,85,0.5);
+  pointer-events: none;
+  z-index: 300;
+  opacity: 0;
+}
+.countdown-flash.pop {
+  animation: countdownPop 0.9s ease-out forwards;
+}
+@keyframes countdownPop {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(0.4); }
+  20% { opacity: 0.95; transform: translate(-50%,-50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1.3); }
 }
 #thumb {
   display: block;

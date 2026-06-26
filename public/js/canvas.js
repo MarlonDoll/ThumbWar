@@ -5,9 +5,14 @@
 
 (function (global) {
   const DEFAULT_PALETTE = [
-    '#000000', '#ffffff', '#ff0000', '#ff8a00', '#ffd400',
-    '#1eb854', '#00b3ff', '#2b5bff', '#8b4cff', '#ff3ea5',
-    '#6b3f1d', '#8a8a8a'
+    // core
+    '#000000', '#ffffff', '#9b9b9b', '#ff2d55', '#ff0000',
+    '#ff8a00', '#ffd400', '#1eb854', '#00b3ff', '#2b5bff',
+    '#8b4cff', '#ff3ea5',
+    // skin tones
+    '#ffe0bd', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3317',
+    // extras
+    '#7a4b2a', '#00e5ff', '#a3e635', '#f97316', '#e11d48', '#1e293b'
   ];
 
   function createCanvas(w, h) {
@@ -253,13 +258,26 @@
 
     // Start drag-to-place mode for newly added text. The text follows
     // the pointer until the user clicks/taps to commit it.
-    _startTextDrag(opts) {
-      const snapshot = this.ctx.getImageData(0, 0, this.width, this.height);
-      let cx = opts.x;
-      let cy = opts.y;
-
+    // Stamp a sticker emoji onto the canvas in draggable move mode.
+    beginSticker(emoji) {
+      const size = 160;
       const draw = (x, y) => {
-        this.ctx.putImageData(snapshot, 0, 0);
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.font = `${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, x, y);
+        ctx.restore();
+      };
+      this._beginPlacement(draw, this.width / 2, this.height / 2);
+    }
+
+    // Place text in a draggable "move mode": the text follows your finger
+    // while dragging and only commits when you hit Place (or Enter). You can
+    // reposition as many times as you like before committing.
+    _startTextDrag(opts) {
+      const renderAt = (x, y) => {
         const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
         this.color = opts.color;
         this.textSize = opts.size;
@@ -271,44 +289,68 @@
         this.textFont = prev.font;
         this.textBold = prev.bold;
       };
+      this._beginPlacement(renderAt, opts.x, opts.y);
+    }
+
+    // Shared draggable-placement scaffold used by text and stickers.
+    _beginPlacement(renderAt, x0, y0) {
+      const snapshot = this.ctx.getImageData(0, 0, this.width, this.height);
+      let cx = x0;
+      let cy = y0;
+      let dragging = false;
+      let grabDX = 0;
+      let grabDY = 0;
+
+      const draw = (x, y) => {
+        this.ctx.putImageData(snapshot, 0, 0);
+        renderAt(x, y);
+      };
 
       draw(cx, cy);
 
-      const onMove = (e) => {
-        const { x, y } = this._coords(e);
-        cx = x;
-        cy = y;
-        draw(x, y);
-      };
       const onDown = (e) => {
         e.preventDefault();
         e.stopPropagation();
         const { x, y } = this._coords(e);
-        draw(x, y);
-        cleanup();
-        this._pushUndo();
+        dragging = true;
+        grabDX = x - cx;
+        grabDY = y - cy;
+        try { this.canvas.setPointerCapture?.(e.pointerId); } catch {}
+      };
+      const onMove = (e) => {
+        if (!dragging) return;
+        const { x, y } = this._coords(e);
+        cx = x - grabDX;
+        cy = y - grabDY;
+        draw(cx, cy);
+      };
+      const onUp = (e) => {
+        dragging = false;
+        try { this.canvas.releasePointerCapture?.(e.pointerId); } catch {}
       };
       const onKey = (e) => {
-        if (e.key === 'Escape') {
-          this.ctx.putImageData(snapshot, 0, 0);
-          cleanup();
-        } else if (e.key === 'Enter') {
-          cleanup();
-          this._pushUndo();
-        }
+        if (e.key === 'Escape') cancel();
+        else if (e.key === 'Enter') commit();
       };
 
+      const commit = () => { cleanup(); this._pushUndo(); };
+      const cancel = () => { this.ctx.putImageData(snapshot, 0, 0); cleanup(); };
+
       const cleanup = () => {
-        this.canvas.removeEventListener('pointermove', onMove);
         this.canvas.removeEventListener('pointerdown', onDown);
+        this.canvas.removeEventListener('pointermove', onMove);
+        this.canvas.removeEventListener('pointerup', onUp);
         document.removeEventListener('keydown', onKey);
         this._textDragActive = false;
+        if (window.onTextPlaced) window.onTextPlaced();
       };
 
       this._textDragActive = true;
-      this.canvas.addEventListener('pointermove', onMove);
       this.canvas.addEventListener('pointerdown', onDown);
+      this.canvas.addEventListener('pointermove', onMove);
+      this.canvas.addEventListener('pointerup', onUp);
       document.addEventListener('keydown', onKey);
+      if (window.onTextPlacing) window.onTextPlacing(commit, cancel);
     }
 
     _drawText(x, y, text) {

@@ -17,24 +17,39 @@
   const joinError = document.getElementById('join-error');
   const resumeLink = document.getElementById('resume-link');
 
-  // Render featured grid
+  // Render featured grid. Cards whose image is missing hide themselves, and
+  // if none load we hide the whole section so there are no broken images.
   const featuredGrid = document.getElementById('featured-grid');
   const featuredSection = document.querySelector('.featured-section');
   if (featuredGrid) {
-    if (FEATURED.length === 0 && featuredSection) {
+    let loaded = 0;
+    let settled = 0;
+    const total = FEATURED.length;
+    const maybeHideSection = () => {
+      if (settled === total && loaded === 0 && featuredSection) {
+        featuredSection.hidden = true;
+      }
+    };
+    if (total === 0 && featuredSection) {
       featuredSection.hidden = true;
     }
     for (const f of FEATURED) {
       const card = document.createElement('div');
       card.className = 'featured-card';
-      card.innerHTML = `
-        <img src="/images/featured/${f.file}" alt="${f.title}" />
-        <div class="featured-meta">
-          <div class="featured-card-title">${f.title}</div>
-          <div class="featured-card-creator">${f.creator}</div>
-          ${f.winner ? `<div class="featured-card-winner">drawn by ${f.winner}</div>` : ''}
-        </div>
+      const img = document.createElement('img');
+      img.alt = f.title;
+      img.onload = () => { loaded++; settled++; maybeHideSection(); };
+      img.onerror = () => { settled++; card.remove(); maybeHideSection(); };
+      img.src = `/images/featured/${f.file}`;
+      const meta = document.createElement('div');
+      meta.className = 'featured-meta';
+      meta.innerHTML = `
+        <div class="featured-card-title">${f.title}</div>
+        <div class="featured-card-creator">${f.creator}</div>
+        ${f.winner ? `<div class="featured-card-winner">drawn by ${f.winner}</div>` : ''}
       `;
+      card.appendChild(img);
+      card.appendChild(meta);
       featuredGrid.appendChild(card);
     }
   }

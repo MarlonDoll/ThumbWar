@@ -133,7 +133,6 @@
       const card = document.createElement('div');
       card.className = 'host-thumb';
       card.innerHTML = `
-        <div class="vs-letter">${String.fromCharCode(65 + i)}</div>
         <img src="${t.png}" alt="Thumbnail ${i + 1}" />
       `;
       row.appendChild(card);
@@ -171,14 +170,20 @@
   function renderBrowse() {
     useTpl('host-tpl-browse');
     const grid = document.getElementById('host-browse-grid');
+    // Show EVERY thumbnail from every concept, not just winners.
     for (const c of state.public.browse.concepts) {
-      const card = document.createElement('div');
-      card.className = 'browse-card';
-      card.innerHTML = `
-        ${c.thumbnail ? `<img src="${c.thumbnail.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
-        <div class="browse-title">${escapeHtml(c.title.title)}</div>
-      `;
-      grid.appendChild(card);
+      const thumbs = (c.allThumbnails && c.allThumbnails.length)
+        ? c.allThumbnails
+        : (c.thumbnail ? [c.thumbnail] : []);
+      for (const t of thumbs) {
+        const card = document.createElement('div');
+        card.className = 'browse-card';
+        card.innerHTML = `
+          ${t.png ? `<img src="${t.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
+          <div class="browse-title">${escapeHtml(c.title.title)}</div>
+        `;
+        grid.appendChild(card);
+      }
     }
   }
 

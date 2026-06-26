@@ -208,8 +208,8 @@
         const el = document.getElementById(id);
         if (el) el.value = String(val);
       };
-      setVal('cfg-write', cfg.WRITE_SECONDS || 90);
-      setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
+      setVal('cfg-write', cfg.WRITE_SECONDS || 45);
+      setVal('cfg-draw', cfg.DRAW_SECONDS || 240);
       setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
@@ -625,6 +625,35 @@
     document.getElementById('clear').onclick = () => {
       if (confirm('Clear canvas?')) canvas.clear();
     };
+
+    // Stickers — stamp an emoji in draggable move mode.
+    document.querySelectorAll('.sticker-btn').forEach((btn) => {
+      btn.onclick = () => canvas.beginSticker(btn.dataset.sticker);
+    });
+
+    // Place / cancel banner for text + sticker placement.
+    const banner = document.getElementById('place-banner');
+    window.onTextPlacing = (commit, cancel) => {
+      if (!banner) return;
+      banner.hidden = false;
+      document.getElementById('place-confirm').onclick = commit;
+      document.getElementById('place-cancel').onclick = cancel;
+    };
+    window.onTextPlaced = () => { if (banner) banner.hidden = true; };
+
+    // Keyboard shortcuts for tools (ignored while typing in an input).
+    const shortcuts = { p: 'pen', e: 'eraser', f: 'fill', l: 'line', r: 'rect', c: 'circle', a: 'arrow', t: 'text' };
+    if (state.drawing._keyHandler) document.removeEventListener('keydown', state.drawing._keyHandler);
+    state.drawing._keyHandler = (ev) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const tag = (ev.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      const tool = shortcuts[ev.key.toLowerCase()];
+      if (!tool) return;
+      const btn = document.querySelector(`.tool[data-tool="${tool}"]`);
+      if (btn) btn.click();
+    };
+    document.addEventListener('keydown', state.drawing._keyHandler);
   }
 
   function renderVoting() {
@@ -673,7 +702,6 @@
         const voteCount = m.results.votes[t.id] || 0;
         card.classList.toggle('winner', isWinner);
         card.innerHTML = `
-          <div class="vs-letter">${label}</div>
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
           <div class="vote-result ${isWinner ? 'vote-result-winner' : ''}">
@@ -681,34 +709,52 @@
           </div>
         `;
       } else {
+        const mine = t.artistId === state.playerId;
         card.innerHTML = `
-          <div class="vs-letter">${label}</div>
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
-          <button class="btn btn-primary vote-btn" ${alreadyVoted ? 'disabled' : ''}>I'd click this</button>
+          <button class="btn btn-primary vote-btn" data-thumb="${t.id}" ${alreadyVoted || mine ? 'disabled' : ''}>${mine ? 'Your thumbnail' : "I'd click this"}</button>
         `;
-        card.querySelector('.vote-btn').onclick = () => {
-          if (alreadyVoted) return;
-          socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
-            if (res && res.error) showToast(res.error);
-            else {
+        if (!mine) {
+          card.querySelector('.vote-btn').onclick = () => {
+            if (state._myVoteCast) return;
+            socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
+              if (res && res.error) return showToast(res.error);
+              state._myVoteCast = true;
               showToast('Vote cast!');
-              card.classList.add('voted');
-            }
-          });
-        };
+              updateVotingInPlace();
+            });
+          };
+        }
       }
       arena.appendChild(card);
     });
 
-    if (hasResults) {
-      document.getElementById('vote-status').textContent = 'Results! Next matchup coming up…';
+    updateVotingInPlace();
+  }
+
+  // Lightweight update that runs on every state broadcast WITHOUT rebuilding
+  // the card DOM — so other players voting can't destroy your tap target.
+  function updateVotingInPlace() {
+    const voting = state.public.voting;
+    if (!voting || !voting.matchup) return;
+    const m = voting.matchup;
+    const alreadyVoted = (m.votedBy || []).includes(state.playerId) || state._myVoteCast;
+    const statusEl = document.getElementById('vote-status');
+    if (m.results) {
+      if (statusEl) statusEl.textContent = 'Results! Next matchup coming up…';
+      return;
+    }
+    if (alreadyVoted) {
+      document.querySelectorAll('.vote-btn').forEach((b) => {
+        if (!b.disabled) { b.disabled = true; }
+      });
+      const votes = (m.votedBy || []).length;
+      if (statusEl) statusEl.textContent = `Waiting for others… (${votes} voted)`;
     } else if (m.thumbnails.length <= 1) {
-      document.getElementById('vote-status').textContent = 'Solo reveal — advancing…';
-    } else if (alreadyVoted) {
-      document.getElementById('vote-status').textContent = 'Waiting for others to vote…';
+      if (statusEl) statusEl.textContent = 'Solo reveal — advancing…';
     } else {
-      document.getElementById('vote-status').textContent = 'Tap the thumbnail you would click.';
+      if (statusEl) statusEl.textContent = 'Tap the thumbnail you would click.';
     }
   }
 
@@ -972,6 +1018,33 @@
     timerPill.textContent = roundPrefix + formatTime(remaining);
     timerPill.classList.toggle('urgent', remaining <= 10);
     maybeTick(remaining, state.public.phase);
+    maybeWarn(remaining, state.public.phase);
+  }
+
+  // Big on-screen warning near the end of a timed phase.
+  let lastWarnSecond = -1;
+  function maybeWarn(remaining, phase) {
+    const timed = phase === 'writing' || phase === 'drawing' || phase === 'voting';
+    if (!timed) { lastWarnSecond = -1; return; }
+    if (remaining === lastWarnSecond) return;
+    if (remaining === 10) showToast('⏰ 10 seconds left!');
+    if (remaining <= 5 && remaining >= 1) showCountdownFlash(remaining);
+    lastWarnSecond = remaining;
+  }
+
+  function showCountdownFlash(n) {
+    let el = document.getElementById('countdown-flash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'countdown-flash';
+      el.className = 'countdown-flash';
+      document.body.appendChild(el);
+    }
+    el.textContent = n;
+    el.classList.remove('pop');
+    // force reflow to restart animation
+    void el.offsetWidth;
+    el.classList.add('pop');
   }
 
   function formatTime(sec) {
@@ -992,23 +1065,36 @@
     const lastPhase = state._lastPhase;
     if (phase !== lastPhase) {
       state._lastPhase = phase;
+      // Tear down drawing-phase key handler when leaving drawing.
+      if (lastPhase === 'drawing' && state.drawing && state.drawing._keyHandler) {
+        document.removeEventListener('keydown', state.drawing._keyHandler);
+        state.drawing._keyHandler = null;
+      }
       if (phase === 'writing') state.suggestionCache = { personas: null, formats: null };
       if (phase === 'drawing') {
         if (state.drawing._pollInterval) clearInterval(state.drawing._pollInterval);
         if (state.drawing._autoSubmitInterval) clearInterval(state.drawing._autoSubmitInterval);
         state.drawing = { activeIndex: 0, canvas: null, cachedPngs: {} };
       }
-      if (phase === 'voting') state._lastMatchupIndex = null;
+      if (phase === 'voting') { state._votingSig = null; state._myVoteCast = false; }
     }
     if (phase === 'voting') {
-      const idx = state.public.voting ? state.public.voting.index : null;
-      if (idx !== state._lastMatchupIndex) {
-        state._lastMatchupIndex = idx;
+      const v = state.public.voting;
+      const idx = v ? v.index : null;
+      const hasResults = !!(v && v.matchup && v.matchup.results);
+      const sig = idx + '|' + hasResults;
+      if (sig !== state._votingSig) {
+        // New matchup or results just revealed — full rebuild.
+        if (idx !== state._lastMatchupIndex) {
+          state._lastMatchupIndex = idx;
+          state._myVoteCast = false;
+        }
+        state._votingSig = sig;
         renderVoting();
-        return;
+      } else {
+        // Same matchup — just patch status/buttons in place, no DOM rebuild.
+        updateVotingInPlace();
       }
-      // Only re-render voting if something changed (votedBy etc.)
-      renderVoting();
       return;
     }
     if (phase === 'lobby') renderLobby();
