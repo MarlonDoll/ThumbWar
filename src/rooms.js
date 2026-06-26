@@ -688,6 +688,7 @@ class RoomManager {
         spectator: p.spectator
       })),
       timerEndsAt: room.timerEndsAt,
+      serverNow: Date.now(),
       config: room.config,
       currentRound: room.currentRound || 0,
       totalRounds: room.config.ROUNDS || 1

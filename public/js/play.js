@@ -429,7 +429,7 @@
       }
       if (state.drawing._autoSubmitted) return;
       if (!state.public.timerEndsAt) return;
-      const remaining = state.public.timerEndsAt - Date.now();
+      const remaining = state.public.timerEndsAt - (Date.now() + (state.clockOffset || 0));
       if (remaining < 3500) {
         state.drawing._autoSubmitted = true;
         clearInterval(state.drawing._autoSubmitInterval);
@@ -1009,7 +1009,8 @@
       timerPill.hidden = true;
       return;
     }
-    const remaining = Math.max(0, Math.round((state.public.timerEndsAt - Date.now()) / 1000));
+    const skew = state.clockOffset || 0;
+    const remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));
     timerPill.hidden = false;
     const totalRounds = state.public.totalRounds || 1;
     const roundPrefix = totalRounds > 1
@@ -1118,6 +1119,10 @@
   socket.on('state', (pub) => {
     const prevPhase = state.public?.phase;
     state.public = pub;
+    // Correct for client/server clock skew so timers are accurate everywhere.
+    if (typeof pub.serverNow === 'number') {
+      state.clockOffset = pub.serverNow - Date.now();
+    }
     if (prevPhase !== pub.phase) {
       // Reset per-phase render flags so the next phase initialises cleanly
       state._writingRendered = false;

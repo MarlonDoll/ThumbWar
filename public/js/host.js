@@ -25,6 +25,9 @@
   });
   socket.on('state', (pub) => {
     state.public = pub;
+    if (typeof pub.serverNow === 'number') {
+      state.clockOffset = pub.serverNow - Date.now();
+    }
     render();
   });
 
@@ -254,7 +257,8 @@
       if (big) big.textContent = '--:--';
       return;
     }
-    const remaining = Math.max(0, Math.round((state.public.timerEndsAt - Date.now()) / 1000));
+    const skew = state.clockOffset || 0;
+    const remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));
     timerPill.hidden = false;
     const s = formatTime(remaining);
     timerPill.textContent = s;
