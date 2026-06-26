@@ -6,9 +6,9 @@
   // Each card needs: { file, title, creator, winner }
   const FEATURED = [
     { file: 'zombies.png', title: 'I make the perfect machine to stop Zombies', creator: 'Stephen', winner: 'nick' },
-    { file: 'cult.png', title: 'How I infiltrated a cult', creator: 'Stephen', winner: 'nick' },
-    { file: 'god.png', title: 'I Lived like God for a Day', creator: 'Marlon', winner: 'The Yoan' },
-    { file: 'tamigotchi.png', title: 'I Let My Tamigotchi Control My Life', creator: 'Marlon', winner: 'nick' }
+    { file: 'cult.PNG', title: 'How I infiltrated a cult', creator: 'Stephen', winner: 'nick' },
+    { file: 'god.PNG', title: 'I Lived like God for a Day', creator: 'Marlon', winner: 'The Yoan' },
+    { file: 'tamigotchi.PNG', title: 'I Let My Tamigotchi Control My Life', creator: 'Marlon', winner: 'nick' }
   ];
 
   const createForm = document.getElementById('create-form');
