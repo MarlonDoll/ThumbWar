@@ -1,9 +1,9 @@
 // Build drawing assignments for each round.
 //
 // Each player draws exactly 1 thumbnail per round. Players are paired
-// into VS battles using a round-robin tournament rotation so different
+// into VS battles using the circle-method round-robin so different
 // people face each other every round. With odd player counts, one
-// matchup becomes a 3-way VS to use the extra player.
+// matchup becomes a 3-way VS so nobody sits idle.
 //
 // Returns: { [writerId]: [drawerId, ...], ... }
 
@@ -25,81 +25,76 @@ function buildAssignments(playerIds, roundIndex) {
     return assignments;
   }
 
-  // Round-robin pairing: rotate everyone except the first player.
-  // This ensures over (n-1) rounds, every pair faces off exactly once.
-  const rotated = roundRobinOrder(playerIds, round);
-  const pairs = pairUpRotated(rotated);
+  if (n === 3) {
+    // Classic 3-player battle: rotate which title is featured each round,
+    // the other two players draw it (2-way VS). The writer sits out drawing
+    // (they wrote it) — respects no-self-draw.
+    const writerIdx = round % 3;
+    const writer = playerIds[writerIdx];
+    assignments[writer] = [
+      playerIds[(writerIdx + 1) % 3],
+      playerIds[(writerIdx + 2) % 3]
+    ];
+    return assignments;
+  }
 
-  // For each pair, pick a title to draw that wasn't written by either drawer.
-  // Use a writer rotation that also depends on round to vary titles.
-  const titleOffset = (round * Math.floor(n / 2)) % n;
-  const usedWriters = new Set();
-  for (const pair of pairs) {
-    const writerId = pickTitleForPair(playerIds, pair, titleOffset, usedWriters);
+  // 4+ players: circle-method round-robin pairing of drawers.
+  const pairs = roundRobinPairs(playerIds, round);
+
+  // Odd player count leaves one person out — attach them to a rotating
+  // pair as a 3rd drawer so everyone draws exactly once.
+  const paired = new Set();
+  pairs.forEach((p) => p.forEach((id) => paired.add(id)));
+  const leftover = playerIds.filter((id) => !paired.has(id));
+  if (leftover.length === 1 && pairs.length > 0) {
+    const idx = round % pairs.length;
+    pairs[idx] = [...pairs[idx], leftover[0]];
+  }
+
+  // Give each group a title written by someone NOT in the group.
+  const titleOffset = (round * 2) % n;
+  const used = new Set();
+  for (const group of pairs) {
+    const writerId = pickTitleForGroup(playerIds, group, titleOffset, used);
     if (writerId) {
-      usedWriters.add(writerId);
-      assignments[writerId] = pair;
+      used.add(writerId);
+      assignments[writerId] = group;
     }
   }
 
   return assignments;
 }
 
-// Standard round-robin scheduling: keep first player fixed, rotate rest.
-// For odd n, we treat the last player as a "bye marker" — they form a
-// 3-way matchup with the pair that would have had the bye.
-function roundRobinOrder(playerIds, round) {
-  const n = playerIds.length;
-  const m = n % 2 === 0 ? n : n + 1; // even total for rotation
-  // Build a virtual list where last slot is "bye" if odd
-  const order = playerIds.slice();
-  if (n % 2 !== 0) order.push(null); // null = bye marker
+// Circle method: fix the first player, rotate the rest by `round`.
+// Over (n-1) rounds every pair meets exactly once.
+function roundRobinPairs(players, round) {
+  const arr = players.slice();
+  if (arr.length % 2 === 1) arr.push(null); // bye marker
+  const m = arr.length;
+  const fixed = arr[0];
+  const rest = arr.slice(1);
+  const r = round % (m - 1);
+  const rotated = rest.slice(r).concat(rest.slice(0, r));
+  const lineup = [fixed, ...rotated];
 
-  // Rotate everything except index 0 by `round` positions
-  // (clockwise rotation of slots 1..m-1)
-  const rotated = [order[0]];
-  for (let i = 1; i < m; i++) {
-    const from = ((i - 1 + round) % (m - 1)) + 1;
-    rotated.push(order[from]);
-  }
-  return rotated;
-}
-
-function pairUpRotated(order) {
-  // Standard round-robin pairing: pair index i with index m-1-i
-  const m = order.length;
   const pairs = [];
   for (let i = 0; i < m / 2; i++) {
-    const a = order[i];
-    const b = order[m - 1 - i];
-    if (a == null || b == null) {
-      // Pair with bye — that player doesn't draw this round in pure
-      // round-robin, but we want everyone to draw. So find who got
-      // the bye and merge them into the previous pair as a 3-way.
-      const survivor = a == null ? b : a;
-      if (pairs.length > 0) {
-        pairs[pairs.length - 1] = [...pairs[pairs.length - 1], survivor];
-      }
-    } else {
-      pairs.push([a, b]);
-    }
+    const a = lineup[i];
+    const b = lineup[m - 1 - i];
+    if (a !== null && b !== null) pairs.push([a, b]);
   }
   return pairs;
 }
 
-function pickTitleForPair(playerIds, pair, titleOffset, usedWriters) {
+function pickTitleForGroup(playerIds, group, titleOffset, used) {
   const n = playerIds.length;
-  const pairSet = new Set(pair);
-  // Start at titleOffset and find the first writer not in the pair and not used
+  const groupSet = new Set(group);
   for (let i = 0; i < n; i++) {
     const cand = playerIds[(titleOffset + i) % n];
-    if (!pairSet.has(cand) && !usedWriters.has(cand)) {
-      return cand;
-    }
+    if (!groupSet.has(cand) && !used.has(cand)) return cand;
   }
-  // Fallback: just find any unused writer
   for (const cand of playerIds) {
-    if (!usedWriters.has(cand)) return cand;
+    if (!used.has(cand) && !groupSet.has(cand)) return cand;
   }
   return null;
 }

@@ -46,12 +46,11 @@ async function run() {
   p2.on('private', (pv) => (privs.p2 = pv));
   p3.on('private', (pv) => (privs.p3 = pv));
 
-  await wait(1500);
-  console.log('players in lobby:', states.host.players.length);
-
-  // Set rounds to 1 for a quick smoke test
+  // Set rounds to 1 for a quick smoke test (also triggers a state broadcast
+  // so our freshly-attached listeners populate states.host).
   await emitAsync(host, 'set-rounds', { rounds: 1 });
-  await wait(100);
+  await wait(400);
+  console.log('players in lobby:', states.host.players.length);
 
   const start = await emitAsync(host, 'start-game', {});
   console.log('start-game:', start);

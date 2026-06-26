@@ -15,13 +15,16 @@ const PHASES = {
 };
 
 const DEFAULTS = {
-  WRITE_SECONDS: 90,
-  DRAW_SECONDS: 180,
+  WRITE_SECONDS: 45,
+  DRAW_SECONDS: 240,
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 30,
   PERSONA_MODE: 'drawer', // 'writer' | 'drawer'
   ROUNDS: 3
 };
+
+// How long the winner reveal stays on screen between matchups.
+const REVEAL_MS = 3500;
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -299,9 +302,16 @@ class RoomManager {
     delete m.results;
     // Solo mode: 1 thumbnail, no vote needed — flash the reveal briefly.
     if (m.thumbnails.length <= 1) {
-      this._clearTimer(room);
-      room.timerEndsAt = Date.now() + 3000;
-      room.timerHandle = setTimeout(() => this._advanceMatchup(room), 3000);
+      this._startTimer(room, 3, () => {
+        room.round.matchupResults.push({
+          writerId: m.writerId,
+          title: m.title,
+          thumbnails: m.thumbnails,
+          votes: m.votes,
+          winners: m.thumbnails[0] ? [m.thumbnails[0].id] : []
+        });
+        this._nextMatchupOrFinish(room);
+      });
       this._broadcastAll(room);
       return;
     }
@@ -318,6 +328,8 @@ class RoomManager {
     if (room.phase !== PHASES.VOTING) return { error: 'Not in voting phase' };
     const m = this._currentMatchup(room);
     if (!m) return { error: 'No active matchup' };
+    // Reveal in progress — voting is closed for this matchup.
+    if (m.results) return { error: 'Voting closed for this matchup' };
     if (m.votedBy.has(playerId)) return { error: 'Already voted' };
     const target = m.thumbnails.find((t) => t.id === thumbnailId);
     if (!target) return { error: 'Unknown thumbnail' };
@@ -325,6 +337,8 @@ class RoomManager {
     if (target.artistId === playerId) return { error: 'Cannot vote for your own thumbnail' };
     m.votes[thumbnailId] = (m.votes[thumbnailId] || 0) + 1;
     m.votedBy.add(playerId);
+    // Broadcast so everyone sees the updated tally / "waiting" state.
+    this._broadcastAll(room);
     if (this._allEligibleVoted(room, m)) {
       this._advanceMatchup(room);
     }
@@ -343,47 +357,32 @@ class RoomManager {
     return eligible.every((p) => matchup.votedBy.has(p.id));
   }
 
+  // Called when voting ends for the current matchup (timer expiry or all
+  // eligible players voted). Locks in results, shows the reveal, then
+  // schedules the move to the next matchup.
   _advanceMatchup(room) {
-    this._clearTimer(room);
     const m = this._currentMatchup(room);
-    if (m) {
-      // Compute winning thumbnail(s) for this matchup
-      let max = -1;
-      for (const id of Object.keys(m.votes)) {
-        if (m.votes[id] > max) max = m.votes[id];
-      }
-      const winners = Object.keys(m.votes).filter(
-        (id) => m.votes[id] === max && max > 0
-      );
+    if (!m) {
+      this._clearTimer(room);
+      this._nextMatchupOrFinish(room);
+      return;
+    }
+    // Already revealing — ignore duplicate calls.
+    if (m.results) return;
 
-      // If results haven't been shown yet, store them and broadcast for 4s
-      if (!m.results) {
-        m.results = { winners, votes: { ...m.votes } };
-        this._broadcastAll(room);
-        room.timerEndsAt = Date.now() + 4000;
-        room.timerHandle = setTimeout(() => {
-          room.timerHandle = null;
-          room.timerEndsAt = null;
-          // Now actually advance
-          room.round.matchupResults.push({
-            writerId: m.writerId,
-            title: m.title,
-            thumbnails: m.thumbnails,
-            votes: m.votes,
-            winners
-          });
-          room.round.voteIndex += 1;
-          if (room.round.voteIndex >= room.round.voting.length) {
-            this._finishVoting(room);
-            this._broadcastAll(room);
-          } else {
-            this._beginCurrentMatchup(room);
-          }
-        }, 4000);
-        return;
-      }
+    this._clearTimer(room);
 
-      // Results already shown (shouldn't normally reach here, but handle gracefully)
+    let max = -1;
+    for (const id of Object.keys(m.votes)) {
+      if (m.votes[id] > max) max = m.votes[id];
+    }
+    const winners = Object.keys(m.votes).filter(
+      (id) => m.votes[id] === max && max > 0
+    );
+    m.results = { winners, votes: { ...m.votes } };
+
+    // Show the reveal for a fixed window, then advance.
+    this._startTimer(room, REVEAL_MS / 1000, () => {
       room.round.matchupResults.push({
         writerId: m.writerId,
         title: m.title,
@@ -391,7 +390,12 @@ class RoomManager {
         votes: m.votes,
         winners
       });
-    }
+      this._nextMatchupOrFinish(room);
+    });
+    this._broadcastAll(room);
+  }
+
+  _nextMatchupOrFinish(room) {
     room.round.voteIndex += 1;
     if (room.round.voteIndex >= room.round.voting.length) {
       this._finishVoting(room);
