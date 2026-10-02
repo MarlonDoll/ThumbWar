@@ -112,6 +112,11 @@
     return n >= 6 ? 3 : 2;
   }
 
+  function nameOf(id) {
+    const p = state.public.players.find((x) => x.id === id);
+    return p ? p.name : 'Unknown';
+  }
+
   function renderVoting() {
     useTpl('host-tpl-voting');
     const v = state.public.voting;
@@ -120,12 +125,21 @@
       return;
     }
     const m = v.matchup;
+    const res = m.results;
     document.getElementById('host-vote-title').textContent = m.title.title;
-    document.getElementById('host-vote-sub').textContent =
-      `Matchup ${v.index + 1} / ${v.total} · Which video would you click?`;
+    const voted = (m.votedBy || []).length;
+    const sub = document.getElementById('host-vote-sub');
+    if (res) {
+      sub.innerHTML = `Matchup ${v.index + 1} / ${v.total} · <strong>${escapeHtml(m.title.persona || '')}</strong> · title by ${escapeHtml(nameOf(m.writerId))}`;
+    } else if (m.thumbnails.length <= 1) {
+      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Solo thumbnail — no vote this time`;
+    } else {
+      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Which video would you click? · ${voted}/${m.eligibleCount || 0} voted`;
+    }
     const row = document.getElementById('host-thumb-row');
     row.innerHTML = '';
     row.classList.toggle('vs-3', m.thumbnails.length >= 3);
+    row.classList.toggle('revealed', !!res);
     m.thumbnails.forEach((t, i) => {
       if (i > 0) {
         const vs = document.createElement('div');
@@ -133,10 +147,26 @@
         vs.textContent = 'VS';
         row.appendChild(vs);
       }
+      const label = String.fromCharCode(65 + i);
       const card = document.createElement('div');
       card.className = 'host-thumb';
+      let footer = '';
+      if (res) {
+        const count = res.votes[t.id] || 0;
+        const won = res.winners.includes(t.id);
+        card.classList.add(won ? 'winner' : 'loser');
+        footer = `
+          <div class="host-thumb-result">
+            <span class="host-thumb-votes">${won ? '🏆 ' : ''}${count} vote${count === 1 ? '' : 's'}</span>
+            <span class="host-thumb-artist">drawn by ${escapeHtml(nameOf(t.artistId))}</span>
+          </div>`;
+      }
       card.innerHTML = `
-        <img src="${t.png}" alt="Thumbnail ${i + 1}" />
+        <div class="host-thumb-img">
+          <img src="${t.png}" alt="Thumbnail ${label}" />
+          <span class="host-thumb-label">${label}</span>
+        </div>
+        ${footer}
       `;
       row.appendChild(card);
     });
@@ -172,6 +202,14 @@
 
   function renderBrowse() {
     useTpl('host-tpl-browse');
+    const b = state.public.browse;
+    const total = b.eligibleCount || 0;
+    const thumbVotes = (b.votedBy?.bestThumb || []).length;
+    const titleVotes = (b.votedBy?.bestTitle || []).length;
+    document.getElementById('host-browse-progress').innerHTML = `
+      <span class="host-browse-pill">🎨 Best Thumbnail · ${thumbVotes}/${total}</span>
+      <span class="host-browse-pill">✍️ Best Title · ${titleVotes}/${total}</span>
+    `;
     const grid = document.getElementById('host-browse-grid');
     // Show EVERY thumbnail from every concept, not just winners.
     for (const c of state.public.browse.concepts) {
@@ -214,6 +252,8 @@
         board.appendChild(li);
       });
 
+    renderHostGallery(document.getElementById('host-gallery'), r.concepts || []);
+
     const awards = document.getElementById('host-awards');
     const awardDefs = [
       { key: 'bestThumb', label: '🎨 Best Thumbnail', showThumb: true },
@@ -246,6 +286,40 @@
         <p class="muted tiny">by ${escapeHtml(nameOf(concept.writerId))}${artistId ? ` · art by ${escapeHtml(nameOf(artistId))}` : ''}</p>
       `;
       awards.appendChild(card);
+    }
+  }
+
+  function renderHostGallery(container, concepts) {
+    container.innerHTML = '';
+    for (const c of concepts) {
+      const votes = c.matchupVotes || {};
+      const thumbs = c.allThumbnails || [];
+      const max = Math.max(0, ...thumbs.map((t) => votes[t.id] || 0));
+      const row = document.createElement('div');
+      row.className = 'matchup-row';
+      row.innerHTML = `
+        <div class="matchup-row-head">
+          <div class="matchup-row-title">${escapeHtml(c.title.title)}</div>
+          <div class="muted small">${escapeHtml(c.title.persona || '')} · written by ${escapeHtml(nameOf(c.writerId))}</div>
+        </div>
+        <div class="matchup-row-thumbs"></div>
+      `;
+      const wrap = row.querySelector('.matchup-row-thumbs');
+      for (const t of thumbs) {
+        const v = votes[t.id] || 0;
+        const won = thumbs.length > 1 && max > 0 && v === max;
+        const card = document.createElement('div');
+        card.className = 'matchup-thumb' + (won ? ' won' : '');
+        card.innerHTML = `
+          <img src="${t.png}" alt="" />
+          <div class="matchup-thumb-meta">
+            <span>${won ? '🏆 ' : ''}${escapeHtml(nameOf(t.artistId))}</span>
+            <span class="muted">${v} vote${v === 1 ? '' : 's'}</span>
+          </div>
+        `;
+        wrap.appendChild(card);
+      }
+      container.appendChild(row);
     }
   }
 

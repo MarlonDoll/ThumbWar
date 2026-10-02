@@ -1776,3 +1776,255 @@ textarea.input-xl {
     width: 80px;
   }
 }
+
+/* ================= Matchup reveal (voting) ================= */
+.vs-yt-artist {
+  font-size: 12px;
+  color: var(--cyan);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Phone reveal: winner glows gold, the rest step back. */
+.vs-card.winner,
+.vs-card.winner:hover {
+  border-color: #ffd400;
+  box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.25), 0 12px 30px rgba(255, 212, 0, 0.2);
+  transform: scale(1.02);
+}
+.vs-card.loser,
+.vs-card.loser:hover {
+  opacity: 0.6;
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* TV display: big thumbnails side by side, A/B labels, winner reveal */
+.host-thumb-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.host-thumb-row .host-thumb {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 820px;
+  transition: transform 0.35s ease, opacity 0.35s ease, border-color 0.35s ease;
+}
+.host-thumb-img {
+  position: relative;
+}
+.host-thumb-label {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--yt-red);
+  color: #fff;
+  font-weight: 900;
+  font-size: 26px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.host-thumb-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  font-size: 24px;
+  font-weight: 800;
+}
+.host-thumb-artist {
+  color: var(--cyan);
+  font-size: 20px;
+}
+.host-thumb-row.revealed .host-thumb.winner {
+  border-color: #ffd400;
+  transform: scale(1.04);
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, 0.25), 0 18px 50px rgba(255, 212, 0, 0.25);
+  animation: winnerPop 0.6s ease-out;
+}
+.host-thumb-row.revealed .host-thumb.loser {
+  opacity: 0.55;
+  transform: scale(0.94);
+}
+@keyframes winnerPop {
+  0% { transform: scale(0.94); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1.04); }
+}
+.host-browse-progress {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0 20px;
+}
+.host-browse-pill {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-weight: 800;
+  font-size: 20px;
+}
+
+/* Browse: the card you voted for */
+.browse-card { position: relative; }
+.browse-card-picked {
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.18);
+}
+.browse-picked-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--cyan);
+  color: #000;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* Results: every matchup with all thumbnails and votes */
+.matchup-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.matchup-row {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.matchup-row-head { margin-bottom: 10px; }
+.matchup-row-title {
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.matchup-row-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.matchup-thumb {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--surface);
+}
+.matchup-thumb.won { border-color: #ffd400; }
+.matchup-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: #fff;
+}
+.matchup-thumb-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ================= Drawing layout ================= */
+/* Stickers sit in one row instead of a tall column, which kept pushing the
+   canvas below the fold. */
+.tool-group.stickers {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .page-play #app { padding: 8px; }
+  .drawing.panel {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 10px;
+  }
+  /* Canvas first, right under the title, so it's what you see. */
+  .drawing .step-pill { display: none; }
+  .drawing .drawing-banner { order: 1; margin: 0; padding: 10px 12px; }
+  .drawing .canvas-shell { order: 2; padding: 3px; }
+  .drawing .toolbar { order: 3; }
+  .drawing .yt-card { order: 4; }
+  .drawing .drawing-footer { order: 5; margin-top: 0; }
+
+  .drawing-banner-label { font-size: 11px; }
+  .drawing-banner-title { font-size: 16px; line-height: 1.25; }
+  .drawing-banner .task-pager .pill { white-space: nowrap; }
+
+  .drawing .toolbar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    min-width: 0;
+    gap: 10px;
+    padding: 10px;
+    margin: 0;
+  }
+  /* Each group becomes one horizontally scrollable strip. */
+  .drawing .tool-group,
+  .drawing .tool-group.stickers {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    min-width: 0;
+  }
+  .drawing .tool-group::-webkit-scrollbar { display: none; }
+  /* The 8 tools share the row so none hide off-screen. */
+  .drawing .tool { flex: 1 1 0; width: auto; min-width: 34px; height: 44px; }
+  .drawing .sticker-btn { flex: 0 0 auto; width: 44px; height: 44px; }
+  .drawing .tool-group-label { display: none; }
+  .drawing .palette {
+    flex-wrap: nowrap;
+    max-width: none;
+  }
+  .drawing .swatch { flex: 0 0 auto; width: 30px; height: 30px; }
+  .drawing .ctl { flex: 1 1 0; min-width: 0; }
+  .drawing .ctl input[type="range"] { width: 100%; }
+  .drawing .tool-group .btn { flex: 1 1 0; }
+
+  .drawing .place-banner {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    font-size: 12px;
+    border-radius: 14px;
+  }
+  .drawing .drawing-footer {
+    padding: 10px 0;
+  }
+  .drawing .drawing-footer .btn-primary {
+    flex: 1 1 100%;
+    font-size: 17px;
+    padding: 14px;
+  }
+
+  .host-thumb-row { flex-direction: column; }
+}
+
+/* The brush-size dot grows up to 32px; negative margins keep it from
+   changing the toolbar height (which used to shift the canvas mid-draw). */
+.ctl .size-preview {
+  margin-top: -16px;
+  margin-bottom: -16px;
+}

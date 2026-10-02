@@ -87,15 +87,6 @@
 
         <div class="lobby-bottom">
           <div class="lobby-settings">
-            <div class="settings-card" id="persona-mode-row">
-              <h3 class="settings-title">Creator Mode</h3>
-              <p class="muted tiny">Who picks the YouTube creator name?</p>
-              <div class="toggle-row">
-                <button class="toggle-btn" id="pm-writer">✍️ Writer</button>
-                <button class="toggle-btn" id="pm-drawer">🎨 Drawer</button>
-              </div>
-            </div>
-
             <div class="settings-card" id="timer-settings">
               <h3 class="settings-title">Game Settings</h3>
               <div class="settings-grid">
@@ -111,10 +102,12 @@
                 <label class="setting-ctl">
                   <span class="setting-label">🎨 Drawing</span>
                   <select id="cfg-draw">
+                    <option value="90">1.5 min</option>
                     <option value="120">2 min</option>
-                    <option value="180">3 min</option>
-                    <option value="240" selected>4 min</option>
+                    <option value="180" selected>3 min</option>
+                    <option value="240">4 min</option>
                     <option value="300">5 min</option>
+                    <option value="420">7 min</option>
                   </select>
                 </label>
                 <label class="setting-ctl">
@@ -172,7 +165,7 @@
         <div class="write-grid">
           <div class="col">
             <h3>Your creator</h3>
-            <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Cult Leader" />
+            <input id="persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Cult Leader (blank = random)" />
             <p class="caveat" style="color:var(--muted);font-size:16px">Or pick a suggestion:</p>
             <div id="persona-suggestions" class="chip-wrap"></div>
           </div>
@@ -287,18 +280,6 @@
           </div>
         </div>
 
-        <div class="drawer-persona-row" id="drawer-persona-row" hidden>
-          <div class="creator-callout">
-            <span class="creator-callout-icon">🎬</span>
-            <div>
-              <strong>Who's the YouTube creator?</strong>
-              <span class="caveat" style="font-size:17px;color:var(--muted)">This appears as the channel name under your thumbnail. Use your name, a celebrity, or a character.</span>
-            </div>
-          </div>
-          <input id="drawer-persona-input" class="input-xl" maxlength="60" placeholder="e.g. MrBeast, Your Mom, A Ninja" />
-          <div id="drawer-persona-chips" class="chip-wrap"></div>
-        </div>
-
         <div class="drawing-footer">
           <span id="drawing-status" class="muted"></span>
           <button class="btn btn-primary btn-lg" id="submit-drawing">Submit Thumbnail</button>
@@ -366,8 +347,8 @@
         <ol id="scoreboard" class="scoreboard"></ol>
         <h2>Awards</h2>
         <div id="awards" class="awards-grid"></div>
-        <h2>The Browse Page</h2>
-        <div id="final-gallery" class="browse-grid"></div>
+        <h2>Every Matchup</h2>
+        <div id="final-gallery" class="matchup-gallery"></div>
         <div class="results-footer">
           <button class="btn btn-primary" id="play-again">Play Again</button>
         </div>

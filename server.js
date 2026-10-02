@@ -108,15 +108,6 @@ io.on('connection', (socket) => {
     broadcastState(room);
   });
 
-  socket.on('set-persona-mode', ({ mode }) => {
-    const room = rooms.get(socket.data.roomCode);
-    if (!room) return;
-    if (room.hostId !== socket.data.playerId) return;
-    if (room.phase !== 'lobby') return;
-    room.config.PERSONA_MODE = mode === 'drawer' ? 'drawer' : 'writer';
-    broadcastState(room);
-  });
-
   socket.on('set-timers', (cfg, cb) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return cb && cb({ error: 'No room' });
@@ -165,7 +156,7 @@ io.on('connection', (socket) => {
   socket.on('submit-drawing', ({ writerId, png, persona }, cb) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return cb && cb({ error: 'No room' });
-    const r = rooms.submitDrawing(room, socket.data.playerId, writerId, png, persona);
+    const r = rooms.submitDrawing(room, socket.data.playerId, writerId, png);
     cb && cb(r);
     broadcastState(room);
   });

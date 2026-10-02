@@ -16,15 +16,17 @@ const PHASES = {
 
 const DEFAULTS = {
   WRITE_SECONDS: 45,
-  DRAW_SECONDS: 240,
+  DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 30,
-  PERSONA_MODE: 'drawer', // 'writer' | 'drawer'
   ROUNDS: 3
 };
 
 // How long the winner reveal stays on screen between matchups.
 const REVEAL_MS = 3500;
+// A matchup nobody is able to vote on (everyone left is one of its artists)
+// is still shown briefly instead of waiting out the full vote timer.
+const NO_VOTERS_SECONDS = 5;
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -174,7 +176,8 @@ class RoomManager {
     room.round.titles[playerId] = {
       id: uid('t'),
       writerId: playerId,
-      persona: persona || '—',
+      // The writer picks the creator; leaving it blank gets a random one.
+      persona: persona || pickRandomPersonas(1)[0],
       format: format || null,
       title
     };
@@ -195,9 +198,11 @@ class RoomManager {
     if (room.phase !== PHASES.WRITING) return;
     this._clearTimer(room);
 
-    // Generate a random title for any writer who didn't submit.
+    // Generate a random title for any writer who didn't submit but is still
+    // here. Writers who left without submitting are dropped from the round.
+    const connected = new Set(this._connectedActive(room).map((p) => p.id));
     for (const id of room.round.writers) {
-      if (!room.round.titles[id]) {
+      if (!room.round.titles[id] && connected.has(id)) {
         const random = generateRandomTitle();
         room.round.titles[id] = {
           id: uid('t'),
@@ -209,14 +214,16 @@ class RoomManager {
       }
     }
 
-    const activeIds = room.round.writers;
-    room.round.assignments = buildAssignments(activeIds, room.currentRound);
+    // Every title gets a matchup; whoever is still connected does the drawing.
+    const titleWriters = room.round.writers.filter((id) => room.round.titles[id]);
+    const drawers = room.round.writers.filter((id) => connected.has(id));
+    room.round.assignments = buildAssignments(titleWriters, drawers);
     room.round.drawTasks = drawTasksByPlayer(room.round.assignments);
     room.phase = PHASES.DRAWING;
     this._startTimer(room, room.config.DRAW_SECONDS, () => this._finishDrawing(room));
   }
 
-  submitDrawing(room, playerId, writerId, png, persona) {
+  submitDrawing(room, playerId, writerId, png) {
     if (room.phase !== PHASES.DRAWING) return { error: 'Not in drawing phase' };
     const tasks = (room.round.drawTasks || {})[playerId] || [];
     if (!tasks.includes(writerId)) return { error: 'Not assigned to this title' };
@@ -225,22 +232,17 @@ class RoomManager {
     }
     if (png.length > 1_800_000) return { error: 'Drawing too large' };
     if (!room.round.drawings[writerId]) room.round.drawings[writerId] = [];
-    const drawPersona = room.config.PERSONA_MODE === 'drawer'
-      ? (persona || '').trim().slice(0, 60) || null
-      : null;
     const existing = room.round.drawings[writerId].find(
       (d) => d.artistId === playerId
     );
     if (existing) {
       existing.png = png;
-      if (drawPersona) existing.persona = drawPersona;
     } else {
       room.round.drawings[writerId].push({
         id: uid('d'),
         writerId,
         artistId: playerId,
-        png,
-        persona: drawPersona
+        png
       });
     }
     if (this._allDrawingsSubmitted(room)) {
@@ -315,9 +317,10 @@ class RoomManager {
       this._broadcastAll(room);
       return;
     }
-    this._startTimer(room, room.config.VOTE_SECONDS, () =>
-      this._advanceMatchup(room)
-    );
+    const seconds = this._eligibleVoters(room, m).length === 0
+      ? Math.min(NO_VOTERS_SECONDS, room.config.VOTE_SECONDS)
+      : room.config.VOTE_SECONDS;
+    this._startTimer(room, seconds, () => this._advanceMatchup(room));
     // Broadcast immediately so the client sees the new matchup + timer.
     // Without this, the client stays on the previous matchup's expired
     // timer until someone votes or the next timer fires.
@@ -345,15 +348,19 @@ class RoomManager {
     return { ok: true };
   }
 
-  _allEligibleVoted(room, matchup) {
-    const eligible = room.players.filter((p) => {
+  // Connected players who can vote on this matchup (anyone who didn't draw
+  // one of its thumbnails — including the title's writer).
+  _eligibleVoters(room, matchup) {
+    return room.players.filter((p) => {
       if (p.spectator || !p.connected) return false;
-      const isArtistInMatchup = matchup.thumbnails.some(
-        (t) => t.artistId === p.id
-      );
-      return !isArtistInMatchup;
+      return !matchup.thumbnails.some((t) => t.artistId === p.id);
     });
-    if (eligible.length === 0) return false;
+  }
+
+  _allEligibleVoted(room, matchup) {
+    const eligible = this._eligibleVoters(room, matchup);
+    // Nobody left who can vote (e.g. voters dropped out) — don't hang.
+    if (eligible.length === 0) return true;
     return eligible.every((p) => matchup.votedBy.has(p.id));
   }
 
@@ -729,12 +736,14 @@ class RoomManager {
           ? {
               writerId: m.writerId,
               title: m.title,
+              // Who drew what stays secret until the results are revealed.
               thumbnails: m.thumbnails.map((t) => ({
                 id: t.id,
                 png: t.png,
-                persona: t.persona || null
+                ...(m.results ? { artistId: t.artistId } : {})
               })),
               votedBy: [...m.votedBy],
+              eligibleCount: this._eligibleVoters(room, m).length,
               results: m.results || null
             }
           : null
@@ -751,10 +760,10 @@ class RoomManager {
           allThumbnails: (c.allThumbnails || []).map((t) => ({
             id: t.id,
             artistId: t.artistId,
-            png: t.png,
-            persona: t.persona || null
+            png: t.png
           }))
         })),
+        eligibleCount: this._connectedActive(room).length,
         votedBy: {
           bestThumb: [...room.browse.votedBy.bestThumb],
           bestTitle: [...room.browse.votedBy.bestTitle]
@@ -773,6 +782,7 @@ class RoomManager {
           artistId: c.artistId,
           title: c.title,
           thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null,
+          matchupVotes: c.matchupVotes || {},
           allThumbnails: c.allThumbnails.map((t) => ({
             id: t.id,
             artistId: t.artistId,
@@ -802,13 +812,24 @@ class RoomManager {
         return {
           writerId: wid,
           title: room.round.titles[wid],
-          submitted: !!existing,
-          myPersona: existing?.persona || null
+          submitted: !!existing
         };
       });
-      if (room.config.PERSONA_MODE === 'drawer') {
-        view.personaSuggestions = pickRandomPersonas(5);
-      }
+    }
+    if (room.phase === PHASES.VOTING) {
+      // Which thumbnails in the current matchup are this player's own, so
+      // the client can disable those vote buttons without revealing artists.
+      const m = this._currentMatchup(room);
+      view.myThumbnailIds = m
+        ? m.thumbnails.filter((t) => t.artistId === playerId).map((t) => t.id)
+        : [];
+    }
+    if (room.phase === PHASES.BROWSE && room.browse) {
+      const choice = room.browse.votedByChoice || {};
+      view.myBrowseVotes = {
+        bestThumb: choice.bestThumb?.[playerId] || null,
+        bestTitle: choice.bestTitle?.[playerId] || null
+      };
     }
     return view;
   }

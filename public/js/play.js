@@ -186,20 +186,6 @@
     specBox.checked = !!(m && m.spectator);
     specBox.onchange = () => socket.emit('set-spectator', { spectator: specBox.checked });
 
-    // Persona mode toggle (host only)
-    const pmRow = document.getElementById('persona-mode-row');
-    const pmWriter = document.getElementById('pm-writer');
-    const pmDrawer = document.getElementById('pm-drawer');
-    const currentPM = state.public.config?.PERSONA_MODE || 'writer';
-    pmWriter.classList.toggle('active', currentPM === 'writer');
-    pmDrawer.classList.toggle('active', currentPM === 'drawer');
-    if (isHost()) {
-      pmWriter.onclick = () => socket.emit('set-persona-mode', { mode: 'writer' });
-      pmDrawer.onclick = () => socket.emit('set-persona-mode', { mode: 'drawer' });
-    } else {
-      pmRow.hidden = true;
-    }
-
     // Timer settings (host only)
     const timerSettings = document.getElementById('timer-settings');
     if (isHost()) {
@@ -209,7 +195,7 @@
         if (el) el.value = String(val);
       };
       setVal('cfg-write', cfg.WRITE_SECONDS || 45);
-      setVal('cfg-draw', cfg.DRAW_SECONDS || 240);
+      setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
       setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
@@ -255,13 +241,6 @@
     const titleInput = document.getElementById('title-input');
     const submitBtn = document.getElementById('submit-title');
 
-    // In drawer mode, hide the persona section — drawers pick persona later
-    const drawerMode = state.public.config?.PERSONA_MODE === 'drawer';
-    if (drawerMode) {
-      const personaCol = personaInput.closest('.col');
-      if (personaCol) personaCol.hidden = true;
-    }
-
     populateSuggestions();
     restoreMyTitle();
 
@@ -269,7 +248,7 @@
       try {
         const res = await fetch('/api/random-title');
         const r = await res.json();
-        if (!drawerMode) personaInput.value = r.persona;
+        personaInput.value = r.persona;
         titleInput.value = r.title;
         titleInput.focus();
       } catch (e) {
@@ -379,27 +358,6 @@
     document.getElementById('next-task').onclick = () => switchTask(1);
     document.getElementById('submit-drawing').onclick = submitCurrentDrawing;
 
-    // In drawer-picks-persona mode, show the persona picker
-    const drawerMode = state.public.config?.PERSONA_MODE === 'drawer';
-    const personaRow = document.getElementById('drawer-persona-row');
-    const personaIn = document.getElementById('drawer-persona-input');
-    if (drawerMode && personaRow) {
-      personaRow.hidden = false;
-      if (!personaIn.value) personaIn.value = me()?.name || '';
-      const chips = document.getElementById('drawer-persona-chips');
-      const sugg = state.private?.personaSuggestions || [];
-      if (chips && sugg.length && chips.children.length === 0) {
-        for (const p of sugg) {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'chip';
-          b.textContent = p;
-          b.onclick = () => { personaIn.value = p; };
-          chips.appendChild(b);
-        }
-      }
-    }
-
     state.drawing.refresh = loadActiveTask;
     loadActiveTask();
     updateDrawingStatus();
@@ -443,10 +401,7 @@
             state.drawing.cachedPngs[t.writerId] = cv.toDataURL();
           }
           const png = state.drawing.cachedPngs[t.writerId];
-          if (png) {
-            const drawPersona = document.getElementById('drawer-persona-input')?.value || '';
-            socket.emit('submit-drawing', { writerId: t.writerId, png, persona: drawPersona });
-          }
+          if (png) socket.emit('submit-drawing', { writerId: t.writerId, png });
         }
         showToast('Auto-submitted drawings (time almost up)');
       }
@@ -505,9 +460,6 @@
         const cached = state.drawing.cachedPngs[t.writerId];
         canvas.loadPng(cached || null);
       }
-      // Restore drawer's persona pick if they already submitted one
-      const dpi = document.getElementById('drawer-persona-input');
-      if (dpi && t.myPersona) dpi.value = t.myPersona;
       if (btn) {
         btn.disabled = false;
         btn.textContent = t.submitted ? '✓ Submitted — Resubmit?' : 'Submit Thumbnail';
@@ -523,8 +475,7 @@
       btn.textContent = 'Submitting…';
       const png = canvas.toDataURL();
       state.drawing.cachedPngs[t.writerId] = png;
-      const drawPersona = document.getElementById('drawer-persona-input')?.value || '';
-      socket.emit('submit-drawing', { writerId: t.writerId, png, persona: drawPersona }, (res) => {
+      socket.emit('submit-drawing', { writerId: t.writerId, png }, (res) => {
         btn.disabled = false;
         if (res && res.error) {
           btn.textContent = 'Try Submitting Again';
@@ -674,6 +625,7 @@
       return;
     }
     const m = voting.matchup;
+    const nameOf = (id) => state.public.players.find((p) => p.id === id)?.name || 'Unknown';
     document.getElementById('vote-title-row').textContent =
       `Matchup ${voting.index + 1} of ${voting.total}`;
     document.getElementById('vote-progress').textContent = '';
@@ -695,9 +647,10 @@
       const card = document.createElement('div');
       card.className = 'vs-card';
       const label = String.fromCharCode(65 + i);
-      // Creator names stay hidden while voting so nobody votes for a friend;
-      // they're revealed alongside the results.
-      const creator = hasResults ? (t.persona || m.title.persona || '') : '';
+      // Creator and artist names stay hidden while voting so nobody votes
+      // for a friend; they're revealed alongside the results.
+      const creator = hasResults ? (m.title.persona || '') : '';
+      const artist = hasResults && t.artistId ? nameOf(t.artistId) : '';
       const creatorInitial = (creator || '?').replace(/^(a|an|the|your|my)\s+/i,'').charAt(0).toUpperCase();
       const ytMeta = `
         <div class="vs-yt-meta">
@@ -705,6 +658,7 @@
           <div class="vs-yt-text">
             <div class="vs-yt-title">${escapeHtml(m.title.title)}</div>
             ${creator ? `<div class="vs-yt-channel">${escapeHtml(creator)}</div>` : ''}
+            ${artist ? `<div class="vs-yt-artist">drawn by ${escapeHtml(artist)}</div>` : ''}
           </div>
         </div>
       `;
@@ -713,6 +667,7 @@
         const isWinner = m.results.winners.includes(t.id);
         const voteCount = m.results.votes[t.id] || 0;
         card.classList.toggle('winner', isWinner);
+        card.classList.toggle('loser', !isWinner);
         card.innerHTML = `
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
@@ -721,7 +676,7 @@
           </div>
         `;
       } else {
-        const mine = t.artistId === state.playerId;
+        const mine = myThumbIds().includes(t.id);
         card.innerHTML = `
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
@@ -745,6 +700,12 @@
     updateVotingInPlace();
   }
 
+  // Thumbnail ids in the current matchup that this player drew (sent
+  // privately so artists stay anonymous to everyone else).
+  function myThumbIds() {
+    return state.private?.myThumbnailIds || [];
+  }
+
   // Lightweight update that runs on every state broadcast WITHOUT rebuilding
   // the card DOM — so other players voting can't destroy your tap target.
   function updateVotingInPlace() {
@@ -757,12 +718,25 @@
       if (statusEl) statusEl.textContent = 'Results! Next matchup coming up…';
       return;
     }
-    if (alreadyVoted) {
+    // Private data can arrive after the public state; lock own thumbnails.
+    const mineIds = myThumbIds();
+    document.querySelectorAll('.vote-btn').forEach((b) => {
+      if (mineIds.includes(b.dataset.thumb)) {
+        b.disabled = true;
+        b.textContent = 'Your thumbnail';
+        b.onclick = null;
+      }
+    });
+    const iDrew = m.thumbnails.some((t) => mineIds.includes(t.id));
+    const votes = (m.votedBy || []).length;
+    const progress = m.eligibleCount ? ` (${votes}/${m.eligibleCount} voted)` : '';
+    if (iDrew && m.thumbnails.length > 1) {
+      if (statusEl) statusEl.textContent = `You drew one of these — sit tight while the others vote${progress}`;
+    } else if (alreadyVoted) {
       document.querySelectorAll('.vote-btn').forEach((b) => {
         if (!b.disabled) { b.disabled = true; }
       });
-      const votes = (m.votedBy || []).length;
-      if (statusEl) statusEl.textContent = `Waiting for others… (${votes} voted)`;
+      if (statusEl) statusEl.textContent = `Waiting for others…${progress}`;
     } else if (m.thumbnails.length <= 1) {
       if (statusEl) statusEl.textContent = 'Solo reveal — advancing…';
     } else {
@@ -827,6 +801,8 @@
       const isMyArt = t.artistId === state.playerId;
       const card = document.createElement('div');
       card.className = 'browse-card' + (isMyArt ? ' browse-card-mine' : '');
+      card.dataset.voteCat = 'bestThumb';
+      card.dataset.voteId = t.id;
       card.innerHTML = `
         ${t.png ? `<img src="${t.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
@@ -861,6 +837,8 @@
       const isMyTitle = c.writerId === state.playerId;
       const card = document.createElement('div');
       card.className = 'browse-card browse-card-title' + (isMyTitle ? ' browse-card-mine' : '');
+      card.dataset.voteCat = 'bestTitle';
+      card.dataset.voteId = c.id;
       card.innerHTML = `
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
         ${isMyTitle ? '<div class="browse-yours">Your title</div>' : ''}
@@ -893,6 +871,23 @@
     }
     document.getElementById('browse-title-section')
       .classList.toggle('needs-vote', thumbVoted && !titleVoted && concepts.some((c) => c.writerId !== state.playerId));
+    markBrowseChoices();
+  }
+
+  // Highlight the card this player currently has their vote on.
+  function markBrowseChoices() {
+    const mine = state.private?.myBrowseVotes || {};
+    document.querySelectorAll('.browse-card[data-vote-cat]').forEach((card) => {
+      const picked = mine[card.dataset.voteCat] === card.dataset.voteId;
+      card.classList.toggle('browse-card-picked', picked);
+      let tag = card.querySelector('.browse-picked-tag');
+      if (picked && !tag) {
+        tag = document.createElement('div');
+        tag.className = 'browse-picked-tag';
+        tag.textContent = '✓ Your vote';
+        card.appendChild(tag);
+      } else if (!picked && tag) tag.remove();
+    });
   }
 
   function renderResults() {
@@ -980,19 +975,8 @@
       awards.appendChild(card);
     }
 
-    // Final gallery
-    const gallery = document.getElementById('final-gallery');
-    gallery.innerHTML = '';
-    (r.concepts || []).forEach((c) => {
-      const card = document.createElement('div');
-      card.className = 'browse-card';
-      card.innerHTML = `
-        ${c.thumbnail ? `<img src="${c.thumbnail.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
-        <div class="browse-title">${escapeHtml(c.title.title)}</div>
-        <div class="browse-meta">${escapeHtml(nameOf(c.writerId))}${c.artistId ? ` · art by ${escapeHtml(nameOf(c.artistId))}` : ''}</div>
-      `;
-      gallery.appendChild(card);
-    });
+    // Final gallery: every matchup with all of its thumbnails and votes.
+    renderMatchupGallery(document.getElementById('final-gallery'), r.concepts || [], nameOf);
 
     const restart = document.getElementById('play-again');
     if (isHost()) {
@@ -1000,6 +984,41 @@
     } else {
       restart.disabled = true;
       restart.textContent = 'Waiting for host…';
+    }
+  }
+
+  function renderMatchupGallery(container, concepts, nameOf) {
+    container.innerHTML = '';
+    container.className = 'matchup-gallery';
+    for (const c of concepts) {
+      const votes = c.matchupVotes || {};
+      const thumbs = c.allThumbnails || [];
+      const max = Math.max(0, ...thumbs.map((t) => votes[t.id] || 0));
+      const row = document.createElement('div');
+      row.className = 'matchup-row';
+      row.innerHTML = `
+        <div class="matchup-row-head">
+          <div class="matchup-row-title">${escapeHtml(c.title.title)}</div>
+          <div class="muted small">${escapeHtml(c.title.persona || '')} · written by ${escapeHtml(nameOf(c.writerId))}</div>
+        </div>
+        <div class="matchup-row-thumbs"></div>
+      `;
+      const wrap = row.querySelector('.matchup-row-thumbs');
+      for (const t of thumbs) {
+        const v = votes[t.id] || 0;
+        const won = thumbs.length > 1 && max > 0 && v === max;
+        const card = document.createElement('div');
+        card.className = 'matchup-thumb' + (won ? ' won' : '');
+        card.innerHTML = `
+          <img src="${t.png}" alt="" />
+          <div class="matchup-thumb-meta">
+            <span>${won ? '🏆 ' : ''}${escapeHtml(nameOf(t.artistId))}</span>
+            <span class="muted">${v} vote${v === 1 ? '' : 's'}</span>
+          </div>
+        `;
+        wrap.appendChild(card);
+      }
+      container.appendChild(row);
     }
   }
 
@@ -1061,6 +1080,10 @@
   function maybeWarn(remaining, phase) {
     const timed = phase === 'writing' || phase === 'drawing' || phase === 'voting';
     if (!timed) { lastWarnSecond = -1; return; }
+    // The vote reveal and solo reveals run on short timers too; counting
+    // those down would flash a big number over the results.
+    const m = phase === 'voting' ? state.public.voting?.matchup : null;
+    if (m && (m.results || m.thumbnails.length <= 1)) { lastWarnSecond = remaining; return; }
     if (remaining === lastWarnSecond) return;
     if (remaining === 10) showToast('⏰ 10 seconds left!');
     if (remaining <= 5 && remaining >= 1) showCountdownFlash(remaining);
@@ -1175,6 +1198,10 @@
     if (state.public && state.public.phase === 'drawing' && state.drawing.canvas) {
       updateDrawingStatus();
     }
+    if (state.public && state.public.phase === 'voting' && document.getElementById('thumb-choices')) {
+      updateVotingInPlace();
+    }
+    if (state.public && state.public.phase === 'browse') markBrowseChoices();
   });
   socket.on('disconnect', () => showToast('Disconnected — reconnecting…'));
   socket.on('connect', () => {

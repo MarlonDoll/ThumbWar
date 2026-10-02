@@ -1,102 +1,68 @@
 // Build drawing assignments for each round.
 //
-// Each player draws exactly 1 thumbnail per round. Players are paired
-// into VS battles using the circle-method round-robin so different
-// people face each other every round. With odd player counts, one
-// matchup becomes a 3-way VS so nobody sits idle.
+// Every title gets its own matchup. Each title is drawn by (up to) two
+// players who didn't write it, so every player draws two thumbnails per
+// round and every title becomes a VS battle. This works the same for odd
+// and even player counts:
+//
+//   - Drawers are shuffled into a ring each round. The player at ring
+//     position p draws the titles written by positions p+1 and p+2, so the
+//     load is exactly 2 thumbnails each and nobody draws their own title.
+//   - Titles whose writer isn't drawing this round (they dropped out after
+//     submitting) are handed to the least-loaded drawers.
+//   - With only 2 drawers, each title can only be drawn by the other person,
+//     so matchups are solo reveals. With 1 player they draw their own.
 //
 // Returns: { [writerId]: [drawerId, ...], ... }
 
-function buildAssignments(playerIds, roundIndex) {
-  const n = playerIds.length;
-  const assignments = {};
-  const round = roundIndex || 0;
+function shuffle(arr, rand) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
+// titleWriterIds: writers whose titles need thumbnails this round.
+// drawerIds: players available to draw (connected, not spectating).
+function buildAssignments(titleWriterIds, drawerIds, rand = Math.random) {
+  const assignments = {};
+  const drawers = shuffle(drawerIds, rand);
+  const n = drawers.length;
   if (n === 0) return assignments;
 
   if (n === 1) {
-    assignments[playerIds[0]] = [playerIds[0]];
+    for (const w of titleWriterIds) assignments[w] = [drawers[0]];
     return assignments;
   }
 
-  if (n === 2) {
-    assignments[playerIds[0]] = [playerIds[1]];
-    assignments[playerIds[1]] = [playerIds[0]];
-    return assignments;
+  const perTitle = Math.min(2, n - 1);
+  const load = Object.fromEntries(drawers.map((d) => [d, 0]));
+  const ringPos = new Map(drawers.map((d, i) => [d, i]));
+
+  // Titles from players in the ring: the two players "behind" them draw it.
+  const leftovers = [];
+  for (const w of titleWriterIds) {
+    if (!ringPos.has(w)) { leftovers.push(w); continue; }
+    const p = ringPos.get(w);
+    const group = [];
+    for (let k = 1; k <= perTitle; k++) group.push(drawers[(p - k + n) % n]);
+    group.forEach((d) => load[d]++);
+    assignments[w] = group;
   }
 
-  if (n === 3) {
-    // Classic 3-player battle: rotate which title is featured each round,
-    // the other two players draw it (2-way VS). The writer sits out drawing
-    // (they wrote it) — respects no-self-draw.
-    const writerIdx = round % 3;
-    const writer = playerIds[writerIdx];
-    assignments[writer] = [
-      playerIds[(writerIdx + 1) % 3],
-      playerIds[(writerIdx + 2) % 3]
-    ];
-    return assignments;
-  }
-
-  // 4+ players: circle-method round-robin pairing of drawers.
-  const pairs = roundRobinPairs(playerIds, round);
-
-  // Odd player count leaves one person out — attach them to a rotating
-  // pair as a 3rd drawer so everyone draws exactly once.
-  const paired = new Set();
-  pairs.forEach((p) => p.forEach((id) => paired.add(id)));
-  const leftover = playerIds.filter((id) => !paired.has(id));
-  if (leftover.length === 1 && pairs.length > 0) {
-    const idx = round % pairs.length;
-    pairs[idx] = [...pairs[idx], leftover[0]];
-  }
-
-  // Give each group a title written by someone NOT in the group.
-  const titleOffset = (round * 2) % n;
-  const used = new Set();
-  for (const group of pairs) {
-    const writerId = pickTitleForGroup(playerIds, group, titleOffset, used);
-    if (writerId) {
-      used.add(writerId);
-      assignments[writerId] = group;
-    }
+  // Titles whose writer isn't drawing: give them to whoever has least to do.
+  for (const w of shuffle(leftovers, rand)) {
+    const group = drawers
+      .slice()
+      .sort((a, b) => load[a] - load[b])
+      .slice(0, perTitle);
+    group.forEach((d) => load[d]++);
+    assignments[w] = group;
   }
 
   return assignments;
-}
-
-// Circle method: fix the first player, rotate the rest by `round`.
-// Over (n-1) rounds every pair meets exactly once.
-function roundRobinPairs(players, round) {
-  const arr = players.slice();
-  if (arr.length % 2 === 1) arr.push(null); // bye marker
-  const m = arr.length;
-  const fixed = arr[0];
-  const rest = arr.slice(1);
-  const r = round % (m - 1);
-  const rotated = rest.slice(r).concat(rest.slice(0, r));
-  const lineup = [fixed, ...rotated];
-
-  const pairs = [];
-  for (let i = 0; i < m / 2; i++) {
-    const a = lineup[i];
-    const b = lineup[m - 1 - i];
-    if (a !== null && b !== null) pairs.push([a, b]);
-  }
-  return pairs;
-}
-
-function pickTitleForGroup(playerIds, group, titleOffset, used) {
-  const n = playerIds.length;
-  const groupSet = new Set(group);
-  for (let i = 0; i < n; i++) {
-    const cand = playerIds[(titleOffset + i) % n];
-    if (!groupSet.has(cand) && !used.has(cand)) return cand;
-  }
-  for (const cand of playerIds) {
-    if (!used.has(cand) && !groupSet.has(cand)) return cand;
-  }
-  return null;
 }
 
 // Flatten assignments into a list of writerIds each player must draw.
