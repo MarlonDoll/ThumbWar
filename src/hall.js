@@ -1,14 +1,19 @@
 // Hall of Thumbs: the best thumbnail from recent games whose host opted in.
 //
-// Entries live in memory and are mirrored to HALL_DIR (default ./data/hall)
-// so they survive a restart on hosts with a persistent disk. Images are
+// Entries live in memory and are mirrored to disk (see HALL_DIR below) so
+// they survive restarts and redeploys when that disk is persistent. Images are
 // written as files rather than kept as data URLs so the landing page can
 // load them like normal images.
 
 const fs = require('fs');
 const path = require('path');
 
-const HALL_DIR = process.env.HALL_DIR || path.join(__dirname, '..', 'data', 'hall');
+// HALL_DIR wins if set. Otherwise use a Railway volume when one is attached
+// (Railway sets RAILWAY_VOLUME_MOUNT_PATH), else a local ./data folder.
+const HALL_DIR = process.env.HALL_DIR
+  || (process.env.RAILWAY_VOLUME_MOUNT_PATH
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'hall')
+    : path.join(__dirname, '..', 'data', 'hall'));
 const INDEX_FILE = path.join(HALL_DIR, 'index.json');
 const MAX_ENTRIES = 12;
 
