@@ -2,6 +2,9 @@
   const socket = io();
   const params = new URLSearchParams(window.location.search);
   const code = (params.get('code') || '').toUpperCase();
+  // Set when a player turned their own device into the TV; the TV then acts
+  // for that player (host controls if they're the host).
+  const tvPlayerId = params.get('player') || null;
 
   if (!code) {
     window.location.href = '/';
@@ -35,7 +38,7 @@
   setInterval(refreshSoundBtn, 1000);
 
   socket.on('connect', () => {
-    socket.emit('host-display', { code }, (res) => {
+    socket.emit('host-display', { code, playerId: tvPlayerId }, (res) => {
       if (res.error) {
         alert(res.error);
         window.location.href = '/';
@@ -70,9 +73,30 @@
     app.appendChild(tpl.content.cloneNode(true));
   }
 
+  function isTvHost() {
+    return !!tvPlayerId && state.public && state.public.hostId === tvPlayerId;
+  }
+
   function renderLobby() {
     useTpl('host-tpl-lobby');
     document.getElementById('big-code').textContent = state.public.code;
+    document.getElementById('host-join-site').textContent = window.location.host;
+    if (tvPlayerId) {
+      document.getElementById('tv-lobby-controls').hidden = false;
+      const start = document.getElementById('tv-start');
+      const active = state.public.players.filter((p) => !p.spectator && p.connected).length;
+      if (isTvHost()) {
+        start.hidden = false;
+        start.disabled = active < 1;
+        start.textContent = active < 1 ? 'Waiting for players…' : `Start Game (${active} player${active === 1 ? '' : 's'})`;
+        start.onclick = () => socket.emit('start-game', {}, (res) => { if (res && res.error) alert(res.error); });
+        document.getElementById('host-lobby-tip').textContent = 'You\'re the host — start when everyone\'s in.';
+      }
+      document.getElementById('tv-back').onclick = () => {
+        socket.emit('set-spectator', { spectator: false });
+        setTimeout(() => { window.location.href = `/play?code=${encodeURIComponent(code)}`; }, 150);
+      };
+    }
     const grid = document.getElementById('host-players');
     grid.innerHTML = '';
     for (const pl of state.public.players) {
@@ -317,6 +341,10 @@
       });
 
     renderHostGallery(document.getElementById('host-gallery'), r.concepts || []);
+    if (isTvHost()) {
+      document.getElementById('tv-results-controls').hidden = false;
+      document.getElementById('tv-play-again').onclick = () => socket.emit('restart', {}, () => {});
+    }
 
     const awards = document.getElementById('host-awards');
     const awardDefs = [

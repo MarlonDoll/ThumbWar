@@ -192,6 +192,20 @@
       grid.appendChild(el);
     }
 
+    // TV / screen share: show the game on a big screen.
+    const tvUrl = `/host?code=${encodeURIComponent(state.public.code)}`;
+    document.getElementById('tv-card-note').innerHTML = state.public.hasDisplay
+      ? '✅ A TV screen is connected.'
+      : `On a smart TV or another computer, open <strong>${escapeHtml(window.location.host)}</strong> and enter the code under “Display screen”.`;
+    document.getElementById('tv-new-tab').onclick = () => window.open(tvUrl, '_blank', 'noopener');
+    document.getElementById('tv-this-device').onclick = () => {
+      const msg = isHost()
+        ? 'This screen will show the game for everyone, and you\'ll watch instead of play on it. You can still start the game from the TV screen (or join from your phone as a player).'
+        : 'This screen will show the game for everyone, and you\'ll watch instead of play on it.';
+      if (!confirm(msg)) return;
+      window.location.href = `${tvUrl}&player=${encodeURIComponent(state.playerId)}`;
+    };
+
     const specBox = document.getElementById('spectator');
     const m = me();
     specBox.checked = !!(m && m.spectator);

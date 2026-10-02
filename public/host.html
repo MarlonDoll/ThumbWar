@@ -29,12 +29,17 @@
     <template id="host-tpl-lobby">
       <section class="host-lobby">
         <h1>Join with this code</h1>
+        <p class="host-join-url">On your phone, go to <strong id="host-join-site"></strong></p>
         <div class="big-code-row">
           <div class="big-code-xxl" id="big-code">----</div>
         </div>
         <h2>Players in the room</h2>
         <div class="player-grid big" id="host-players"></div>
-        <p class="host-tip">Waiting for the host to start…</p>
+        <p class="host-tip" id="host-lobby-tip">Waiting for the host to start…</p>
+        <div class="tv-controls" id="tv-lobby-controls" hidden>
+          <button class="btn btn-primary btn-xl" id="tv-start" hidden>Start Game</button>
+          <button class="btn btn-ghost" id="tv-back">📱 Back to playing on this device</button>
+        </div>
       </section>
     </template>
 
@@ -95,6 +100,9 @@
         <div id="host-awards" class="awards-grid big"></div>
         <h2>Every Matchup</h2>
         <div id="host-gallery" class="matchup-gallery"></div>
+        <div class="tv-controls" id="tv-results-controls" hidden>
+          <button class="btn btn-primary btn-xl" id="tv-play-again">Play Again</button>
+        </div>
       </section>
     </template>
 

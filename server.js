@@ -113,14 +113,26 @@ io.on('connection', (socket) => {
     broadcastState(room);
   });
 
-  socket.on('host-display', ({ code }, cb) => {
+  // A TV / screen-share display. If a player turned their own device into
+  // the TV (playerId given), the display takes over that player's identity:
+  // they become a spectator, and if they're the host they keep host controls
+  // (start / play again) from the TV.
+  socket.on('host-display', ({ code, playerId }, cb) => {
     const room = rooms.get(code);
     if (!room) return cb({ error: 'Room not found' });
     socket.join(room.code);
     socket.data.roomCode = room.code;
     socket.data.isHostDisplay = true;
     room.hostDisplays.add(socket.id);
-    cb({ ok: true });
+    const p = playerId && room.players.find((x) => x.id === playerId);
+    if (p) {
+      socket.data.playerId = p.id;
+      p.socketId = socket.id;
+      p.connected = true;
+      delete p.disconnectedAt;
+      if (room.phase === 'lobby') p.spectator = true;
+    }
+    cb({ ok: true, isHost: !!p && room.hostId === p.id });
     // Phones go quiet once a TV display is connected, so tell everyone.
     broadcastState(room);
   });
@@ -231,6 +243,14 @@ io.on('connection', (socket) => {
     if (!room) return;
     if (socket.data.isHostDisplay) {
       room.hostDisplays.delete(socket.id);
+      // A player's own device acting as the TV went away: treat them as gone
+      // so host handover and cleanup still work.
+      const tvPlayer = room.players.find((x) => x.id === socket.data.playerId);
+      if (tvPlayer && tvPlayer.socketId === socket.id) {
+        tvPlayer.connected = false;
+        tvPlayer.socketId = null;
+        tvPlayer.disconnectedAt = Date.now();
+      }
       broadcastState(room);
       return;
     }

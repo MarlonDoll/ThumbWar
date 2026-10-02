@@ -2322,3 +2322,13 @@ textarea.input-xl {
   .reveal-in > *, .reveal-cover { animation: none !important; }
   .reveal-cover { display: none; }
 }
+
+/* ================= TV / screen share ================= */
+.tv-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; }
+.tv-controls { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 28px; }
+.tv-controls[hidden] { display: none; }
+.host-join-url { color: var(--muted); font-size: 22px; margin: 0 0 4px; }
+.host-join-url strong { color: var(--text); }
+@media (max-width: 720px) {
+  .tv-card-actions .btn { flex: 1 1 100%; }
+}
