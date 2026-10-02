@@ -31,6 +31,7 @@
     else ThumbFx.setMuted(!ThumbFx.isMuted());
     setTimeout(refreshSoundBtn, 100);
   };
+  refreshSoundBtn();
   setInterval(refreshSoundBtn, 1000);
 
   socket.on('connect', () => {
