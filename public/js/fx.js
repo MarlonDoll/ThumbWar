@@ -77,6 +77,16 @@
       tone(110, 0.3, 0.35, { type: 'square', gain: 0.07, slideTo: 55 });
       tone(220, 0.3, 0.2, { type: 'sawtooth', gain: 0.03 });
     },
+    // A card flipping over during the matchup reveal.
+    flip() {
+      noise(0, 0.12, { gain: 0.05, from: 2000, to: 6000 });
+      tone(520, 0.02, 0.12, { type: 'triangle', gain: 0.05, slideTo: 880 });
+    },
+    // The VS badge slamming down between cards.
+    slam() {
+      tone(90, 0, 0.3, { type: 'square', gain: 0.07, slideTo: 45 });
+      noise(0, 0.15, { gain: 0.05, from: 200, to: 900 });
+    },
     // Winner reveal: quick rising arpeggio.
     win() {
       [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.08, 0.3, { type: 'triangle', gain: 0.08 }));
@@ -102,6 +112,27 @@
     try {
       if (canPlay() && sounds[name]) sounds[name]();
     } catch {}
+  }
+
+  // Timing for revealing a matchup's cards one at a time (seconds). Shared
+  // by the phone and TV so their animations and sounds line up.
+  const REVEAL_STEP = 0.45;
+  function revealDelays(count) {
+    return {
+      card: (i) => i * REVEAL_STEP,
+      vs: (i) => i * REVEAL_STEP - 0.2, // badge before card i (i >= 1)
+      total: (count - 1) * REVEAL_STEP + 0.5
+    };
+  }
+
+  // Play flip/slam sounds in step with the reveal. `stillCurrent` lets the
+  // caller cancel if the matchup has already moved on.
+  function playReveal(count, stillCurrent = () => true) {
+    const d = revealDelays(count);
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => stillCurrent() && play('flip'), d.card(i) * 1000);
+      if (i > 0) setTimeout(() => stillCurrent() && play('slam'), d.vs(i) * 1000 + 120);
+    }
   }
 
   function setMuted(m) {
@@ -153,6 +184,8 @@
     isUnlocked: () => !!ctx && ctx.state === 'running',
     unlock: audio,
     countUp,
-    confetti
+    confetti,
+    revealDelays,
+    playReveal
   };
 })(window);

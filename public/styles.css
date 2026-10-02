@@ -2276,3 +2276,49 @@ textarea.input-xl {
   .place-actions .btn { flex: 1 1 0; padding: 10px 4px; }
   .place-hint { font-size: 12px; width: 100%; text-align: center; }
 }
+
+/* ================= Matchup card reveal ================= */
+/* Cards flip in one at a time (delay in --d), face-down first, with the VS
+   slamming between them. Hidden cards can't be tapped (visibility). */
+.reveal-in { perspective: 1200px; }
+.reveal-in > .vs-card,
+.reveal-in > .host-thumb {
+  position: relative;
+  animation: cardReveal 0.5s cubic-bezier(.2, .9, .3, 1.15) var(--d, 0s) both;
+  transform-origin: center;
+}
+.reveal-in > .vs-badge,
+.reveal-in > .host-vs-badge {
+  animation: vsSlam 0.4s cubic-bezier(.2, .9, .3, 1.4) var(--d, 0s) both;
+}
+.reveal-cover {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--yt-red), #ff8a00);
+  pointer-events: none;
+  z-index: 3;
+  animation: coverOff 0.5s linear var(--d, 0s) both;
+}
+.reveal-cover span {
+  font-family: 'Archivo Black', Impact, sans-serif;
+  font-size: clamp(48px, 9vw, 120px);
+  color: #fff;
+  text-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+@keyframes cardReveal {
+  0% { visibility: hidden; opacity: 0; transform: rotateY(-100deg) scale(0.85); }
+  1% { visibility: visible; opacity: 1; }
+  70% { transform: rotateY(10deg) scale(1.04); }
+  100% { visibility: visible; opacity: 1; transform: none; }
+}
+@keyframes coverOff {
+  0%, 45% { opacity: 1; }
+  60%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-in > *, .reveal-cover { animation: none !important; }
+  .reveal-cover { display: none; }
+}

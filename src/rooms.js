@@ -332,9 +332,12 @@ class RoomManager {
       this._broadcastAll(room);
       return;
     }
-    const seconds = this._eligibleVoters(room, m).length === 0
+    // Add the card-reveal animation to the clock so it doesn't eat into
+    // voting time (matches ThumbFx.revealDelays on the clients).
+    const revealSeconds = (m.thumbnails.length - 1) * 0.45 + 0.5;
+    const seconds = (this._eligibleVoters(room, m).length === 0
       ? Math.min(NO_VOTERS_SECONDS, room.config.VOTE_SECONDS)
-      : room.config.VOTE_SECONDS;
+      : room.config.VOTE_SECONDS) + revealSeconds;
     this._startTimer(room, seconds, () => this._advanceMatchup(room));
     // Broadcast immediately so the client sees the new matchup + timer.
     // Without this, the client stays on the previous matchup's expired
@@ -351,8 +354,12 @@ class RoomManager {
     if (m.votedBy.has(playerId)) return { error: 'Already voted' };
     const target = m.thumbnails.find((t) => t.id === thumbnailId);
     if (!target) return { error: 'Unknown thumbnail' };
-    // Players may not vote for their own thumbnail in this matchup.
+    // Artists in this matchup sit it out entirely — voting for a rival's
+    // thumbnail would let them knock out the strongest competitor.
     if (target.artistId === playerId) return { error: 'Cannot vote for your own thumbnail' };
+    if (m.thumbnails.some((t) => t.artistId === playerId)) {
+      return { error: 'You drew one of these — the others are voting' };
+    }
     m.votes[thumbnailId] = (m.votes[thumbnailId] || 0) + 1;
     m.votedBy.add(playerId);
     // Broadcast so everyone sees the updated tally / "waiting" state.

@@ -674,10 +674,18 @@
     const arena = document.getElementById('thumb-choices');
     arena.innerHTML = '';
     arena.classList.toggle('vs-3', m.thumbnails.length >= 3);
-    if (!m.results) {
-      arena.classList.add('enter');
-      if (m.thumbnails.length > 1) sfx('vs');
-    } else {
+    // New matchup: cards flip in one at a time with the VS slamming between.
+    // Each card can't be tapped until it has been revealed.
+    const reveal = !m.results && m.thumbnails.length > 1;
+    const delays = ThumbFx.revealDelays(m.thumbnails.length);
+    if (reveal) {
+      arena.classList.add('reveal-in');
+      const key = `${state.public.currentRound}:${voting.index}`;
+      if (!state.public.hasDisplay) {
+        ThumbFx.playReveal(m.thumbnails.length, () => state.public?.phase === 'voting' &&
+          `${state.public.currentRound}:${state.public.voting?.index}` === key);
+      }
+    } else if (m.results) {
       const total = Object.values(m.results.votes || {}).reduce((a, b) => a + b, 0);
       sfx(m.results.winners.length === 1 && total > 0 ? 'win' : 'tie');
     }
@@ -690,10 +698,12 @@
         const vs = document.createElement('div');
         vs.className = 'vs-badge';
         vs.textContent = 'VS';
+        vs.style.setProperty('--d', `${delays.vs(i)}s`);
         arena.appendChild(vs);
       }
       const card = document.createElement('div');
       card.className = 'vs-card';
+      card.style.setProperty('--d', `${delays.card(i)}s`);
       const label = String.fromCharCode(65 + i);
       // Creator and artist names stay hidden while voting so nobody votes
       // for a friend; they're revealed alongside the results.
@@ -725,12 +735,14 @@
         `;
       } else {
         const mine = myThumbIds().includes(t.id);
+        const iDrewOne = m.thumbnails.some((x) => myThumbIds().includes(x.id));
         card.innerHTML = `
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
-          <button class="btn btn-primary vote-btn" data-thumb="${t.id}" ${alreadyVoted || mine ? 'disabled' : ''}>${mine ? 'Your thumbnail' : "I'd click this"}</button>
+          <button class="btn btn-primary vote-btn" data-thumb="${t.id}" ${alreadyVoted || iDrewOne ? 'disabled' : ''}>${mine ? 'Your thumbnail' : iDrewOne ? 'Rival' : "I'd click this"}</button>
+          ${reveal ? `<div class="reveal-cover" aria-hidden="true"><span>${label}</span></div>` : ''}
         `;
-        if (!mine) {
+        if (!iDrewOne) {
           card.querySelector('.vote-btn').onclick = () => {
             if (state._myVoteCast) return;
             socket.emit('submit-vote', { thumbnailId: t.id }, (res) => {
@@ -768,14 +780,14 @@
     }
     // Private data can arrive after the public state; lock own thumbnails.
     const mineIds = myThumbIds();
-    document.querySelectorAll('.vote-btn').forEach((b) => {
-      if (mineIds.includes(b.dataset.thumb)) {
-        b.disabled = true;
-        b.textContent = 'Your thumbnail';
-        b.onclick = null;
-      }
-    });
     const iDrew = m.thumbnails.some((t) => mineIds.includes(t.id));
+    // If you drew one of these you sit this matchup out: lock every button.
+    document.querySelectorAll('.vote-btn').forEach((b) => {
+      if (!iDrew) return;
+      b.disabled = true;
+      b.onclick = null;
+      b.textContent = mineIds.includes(b.dataset.thumb) ? 'Your thumbnail' : 'Rival';
+    });
     const votes = (m.votedBy || []).length;
     const progress = m.eligibleCount ? ` (${votes}/${m.eligibleCount} voted)` : '';
     if (iDrew && m.thumbnails.length > 1) {

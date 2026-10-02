@@ -16,7 +16,7 @@
   let state = { public: null };
   // What the TV has already announced, so re-renders on every broadcast
   // don't replay sounds and entrance animations.
-  const seen = { matchup: null, reveal: null, scoreboard: null, results: false };
+  const seen = { matchup: null, reveal: null, scoreboard: null, results: false, votingSig: null };
 
   const soundBtn = document.getElementById('sound-toggle');
   function refreshSoundBtn() {
@@ -54,6 +54,7 @@
     const p = state.public;
     if (!p) return;
     if (p.phase !== 'results') seen.results = false;
+    if (p.phase !== 'voting') seen.votingSig = null;
     if (p.phase === 'lobby') return renderLobby();
     if (p.phase === 'writing') return renderWriting();
     if (p.phase === 'drawing') return renderDrawing();
@@ -133,50 +134,56 @@
   }
 
   function renderVoting() {
-    useTpl('host-tpl-voting');
     const v = state.public.voting;
     if (!v || !v.matchup) {
+      useTpl('host-tpl-voting');
       document.getElementById('host-vote-title').textContent = 'Loading…';
+      seen.votingSig = null;
       return;
     }
     const m = v.matchup;
     const res = m.results;
     const matchupKey = `${state.public.currentRound}:${v.index}`;
-    const isNew = seen.matchup !== matchupKey;
-    if (isNew) {
-      seen.matchup = matchupKey;
-      if (m.thumbnails.length > 1) ThumbFx.play('vs');
+    // Build the screen once per matchup (and once more for its results).
+    // Votes coming in only update the subtitle, so the card reveal isn't
+    // restarted or cut off by every broadcast.
+    const sig = `${matchupKey}|${res ? 'res' : 'vote'}`;
+    if (seen.votingSig === sig && document.getElementById('host-thumb-row')) {
+      updateVotingSub();
+      return;
     }
+    seen.votingSig = sig;
+    useTpl('host-tpl-voting');
+
+    const isNew = seen.matchup !== matchupKey;
+    const reveal = isNew && !res && m.thumbnails.length > 1;
+    if (isNew) seen.matchup = matchupKey;
+    if (reveal) ThumbFx.playReveal(m.thumbnails.length, () => seen.matchup === matchupKey);
     if (res && seen.reveal !== matchupKey) {
       seen.reveal = matchupKey;
       const total = Object.values(res.votes || {}).reduce((a, b) => a + b, 0);
       ThumbFx.play(res.winners.length === 1 && total > 0 ? 'win' : 'tie');
     }
     document.getElementById('host-vote-title').textContent = m.title.title;
-    const voted = (m.votedBy || []).length;
-    const sub = document.getElementById('host-vote-sub');
-    if (res) {
-      sub.innerHTML = `Matchup ${v.index + 1} / ${v.total} · <strong>${escapeHtml(m.title.persona || '')}</strong> · title by ${escapeHtml(nameOf(m.writerId))}`;
-    } else if (m.thumbnails.length <= 1) {
-      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Solo thumbnail — no vote this time`;
-    } else {
-      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Which video would you click? · ${voted}/${m.eligibleCount || 0} voted`;
-    }
+    updateVotingSub();
+
     const row = document.getElementById('host-thumb-row');
-    row.innerHTML = '';
     row.classList.toggle('vs-3', m.thumbnails.length >= 3);
     row.classList.toggle('revealed', !!res);
-    row.classList.toggle('enter', isNew);
+    row.classList.toggle('reveal-in', reveal);
+    const delays = ThumbFx.revealDelays(m.thumbnails.length);
     m.thumbnails.forEach((t, i) => {
       if (i > 0) {
         const vs = document.createElement('div');
         vs.className = 'host-vs-badge';
         vs.textContent = 'VS';
+        vs.style.setProperty('--d', `${delays.vs(i)}s`);
         row.appendChild(vs);
       }
       const label = String.fromCharCode(65 + i);
       const card = document.createElement('div');
       card.className = 'host-thumb';
+      card.style.setProperty('--d', `${delays.card(i)}s`);
       let footer = '';
       if (res) {
         const count = res.votes[t.id] || 0;
@@ -194,9 +201,25 @@
           <span class="host-thumb-label">${label}</span>
         </div>
         ${footer}
+        ${reveal ? `<div class="reveal-cover" aria-hidden="true"><span>${label}</span></div>` : ''}
       `;
       row.appendChild(card);
     });
+  }
+
+  function updateVotingSub() {
+    const v = state.public.voting;
+    const m = v && v.matchup;
+    const sub = document.getElementById('host-vote-sub');
+    if (!m || !sub) return;
+    const voted = (m.votedBy || []).length;
+    if (m.results) {
+      sub.innerHTML = `Matchup ${v.index + 1} / ${v.total} · <strong>${escapeHtml(m.title.persona || '')}</strong> · title by ${escapeHtml(nameOf(m.writerId))}`;
+    } else if (m.thumbnails.length <= 1) {
+      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Solo thumbnail — no vote this time`;
+    } else {
+      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Which video would you click? · ${voted}/${m.eligibleCount || 0} voted`;
+    }
   }
 
   function renderScoreboard() {
