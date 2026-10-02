@@ -267,7 +267,7 @@
         <div class="canvas-shell">
           <canvas id="thumb" width="1280" height="720"></canvas>
           <div class="place-banner" id="place-banner" hidden>
-            <span>Drag to position · </span>
+            <span>Drag to move · click away or switch tools to place · </span>
             <button class="btn btn-primary btn-sm" id="place-confirm">Place</button>
             <button class="btn btn-ghost btn-sm" id="place-cancel">Cancel</button>
           </div>
@@ -329,16 +329,32 @@
     <template id="tpl-browse">
       <section class="browse panel">
         <h1 class="phase-headline">📺 THE BROWSE PAGE</h1>
+        <p class="phase-sub caveat">Two votes to cast: the best thumbnail <em>and</em> the best title.</p>
 
-        <h2 id="browse-thumb-header">🎨 Best Thumbnail</h2>
-        <p class="phase-sub caveat">Which thumbnail would make you click? (Can't pick your own art)</p>
-        <div id="browse-thumb-grid" class="browse-grid"></div>
-        <p id="browse-thumb-status" class="muted"></p>
+        <nav class="browse-steps" aria-label="Your votes">
+          <a href="#browse-thumb-section" class="browse-step" id="browse-step-thumb">
+            <span class="browse-step-check" aria-hidden="true">1</span> Best Thumbnail
+          </a>
+          <a href="#browse-title-section" class="browse-step" id="browse-step-title">
+            <span class="browse-step-check" aria-hidden="true">2</span> Best Title
+          </a>
+        </nav>
 
-        <h2 id="browse-title-header">✍️ Best Title Idea</h2>
-        <p class="phase-sub caveat">Which video title is the most clickable? (Can't pick your own title)</p>
-        <div id="browse-title-grid" class="browse-grid"></div>
-        <p id="browse-title-status" class="muted"></p>
+        <div class="browse-section" id="browse-thumb-section">
+          <div class="browse-section-kicker">Vote 1 of 2</div>
+          <h2 id="browse-thumb-header">🎨 Best Thumbnail</h2>
+          <p class="phase-sub caveat">Which thumbnail would make you click? (Can't pick your own art)</p>
+          <div id="browse-thumb-grid" class="browse-grid"></div>
+          <p id="browse-thumb-status" class="muted"></p>
+        </div>
+
+        <div class="browse-section" id="browse-title-section">
+          <div class="browse-section-kicker">Vote 2 of 2</div>
+          <h2 id="browse-title-header">✍️ Best Title Idea</h2>
+          <p class="phase-sub caveat">Which video title is the most clickable? (Can't pick your own title)</p>
+          <div id="browse-title-grid" class="browse-grid"></div>
+          <p id="browse-title-status" class="muted"></p>
+        </div>
       </section>
     </template>
 

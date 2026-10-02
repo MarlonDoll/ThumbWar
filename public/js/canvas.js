@@ -77,7 +77,18 @@
       for (const [ev, fn] of Object.entries(handlers)) {
         c.addEventListener(ev, fn);
       }
+      // A pointerdown anywhere outside the canvas (another tool, a slider,
+      // the page background) commits any text/sticker still being placed.
+      // The Place/Cancel banner is excluded so its buttons keep working.
+      document.addEventListener('pointerdown', (e) => {
+        if (!this._placement) return;
+        if (!this.canvas.isConnected) return;
+        if (c.contains(e.target)) return;
+        if (e.target.closest && e.target.closest('#place-banner')) return;
+        this.commitPlacement();
+      }, true);
       document.addEventListener('keydown', (e) => {
+        if (!this.canvas.isConnected) return;
         if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
           e.preventDefault();
           this.undo();
@@ -102,8 +113,12 @@
     }
 
     _onDown(e) {
-      if (this._textDragActive) return;
+      if (this._placement) return;
       e.preventDefault();
+      // preventDefault keeps focus wherever it was (often a text box or
+      // slider), which silently swallows keyboard shortcuts. Drop it.
+      const active = document.activeElement;
+      if (active && active !== document.body && active.blur) active.blur();
       const { x, y } = this._coords(e);
       this.startX = x;
       this.startY = y;
@@ -270,30 +285,55 @@
         ctx.fillText(emoji, x, y);
         ctx.restore();
       };
-      this._beginPlacement(draw, this.width / 2, this.height / 2);
+      const bounds = (x, y) => ({ x: x - size / 2, y: y - size / 2, w: size, h: size });
+      this._beginPlacement(draw, bounds, this.width / 2, this.height / 2);
     }
 
     // Place text in a draggable "move mode": the text follows your finger
     // while dragging and only commits when you hit Place (or Enter). You can
     // reposition as many times as you like before committing.
     _startTextDrag(opts) {
-      const renderAt = (x, y) => {
+      const withTextStyle = (fn) => {
         const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
         this.color = opts.color;
         this.textSize = opts.size;
         this.textFont = opts.font || 'Impact';
         this.textBold = opts.bold !== false;
-        this._drawText(x, y, opts.text);
-        this.color = prev.color;
-        this.textSize = prev.size;
-        this.textFont = prev.font;
-        this.textBold = prev.bold;
+        try { return fn(); } finally {
+          this.color = prev.color;
+          this.textSize = prev.size;
+          this.textFont = prev.font;
+          this.textBold = prev.bold;
+        }
       };
-      this._beginPlacement(renderAt, opts.x, opts.y);
+      const renderAt = (x, y) => withTextStyle(() => this._drawText(x, y, opts.text));
+      const bounds = (x, y) => withTextStyle(() => {
+        this.ctx.save();
+        this.ctx.font = this._textFontString();
+        const w = this.ctx.measureText(opts.text).width;
+        this.ctx.restore();
+        return { x, y, w, h: this.textSize };
+      });
+      this._beginPlacement(renderAt, bounds, opts.x, opts.y);
+    }
+
+    // Finish any in-progress text/sticker placement, keeping it on the canvas.
+    commitPlacement() {
+      if (this._placement) this._placement.commit();
+    }
+
+    // Finish any in-progress placement, removing it from the canvas.
+    cancelPlacement() {
+      if (this._placement) this._placement.cancel();
     }
 
     // Shared draggable-placement scaffold used by text and stickers.
-    _beginPlacement(renderAt, x0, y0) {
+    // Grab inside the item to drag it; click anywhere else on the canvas to
+    // commit it (and, for drawing tools, start drawing right away).
+    _beginPlacement(renderAt, bounds, x0, y0) {
+      // Only one placement at a time — a second one would capture the first
+      // in its snapshot and the two would overwrite each other.
+      this.commitPlacement();
       const snapshot = this.ctx.getImageData(0, 0, this.width, this.height);
       let cx = x0;
       let cy = y0;
@@ -312,6 +352,16 @@
         e.preventDefault();
         e.stopPropagation();
         const { x, y } = this._coords(e);
+        const b = bounds(cx, cy);
+        const pad = 24;
+        const inside = x >= b.x - pad && x <= b.x + b.w + pad && y >= b.y - pad && y <= b.y + b.h + pad;
+        if (!inside) {
+          commit();
+          // Text tool would just reopen the modal; for everything else, let
+          // the click carry on as the start of a stroke/shape/fill.
+          if (this.tool !== 'text') this._onDown(e);
+          return;
+        }
         dragging = true;
         grabDX = x - cx;
         grabDY = y - cy;
@@ -333,19 +383,28 @@
         else if (e.key === 'Enter') commit();
       };
 
-      const commit = () => { cleanup(); this._pushUndo(); };
-      const cancel = () => { this.ctx.putImageData(snapshot, 0, 0); cleanup(); };
+      const commit = () => {
+        if (this._placement !== placement) return;
+        cleanup();
+        this._pushUndo();
+      };
+      const cancel = () => {
+        if (this._placement !== placement) return;
+        this.ctx.putImageData(snapshot, 0, 0);
+        cleanup();
+      };
+      const placement = { commit, cancel };
 
       const cleanup = () => {
         this.canvas.removeEventListener('pointerdown', onDown);
         this.canvas.removeEventListener('pointermove', onMove);
         this.canvas.removeEventListener('pointerup', onUp);
         document.removeEventListener('keydown', onKey);
-        this._textDragActive = false;
+        this._placement = null;
         if (window.onTextPlaced) window.onTextPlaced();
       };
 
-      this._textDragActive = true;
+      this._placement = placement;
       this.canvas.addEventListener('pointerdown', onDown);
       this.canvas.addEventListener('pointermove', onMove);
       this.canvas.addEventListener('pointerup', onUp);
@@ -358,9 +417,7 @@
       ctx.save();
       ctx.fillStyle = this.color;
       ctx.globalAlpha = this.opacity;
-      const weight = this.textBold ? '900' : '400';
-      const font = this.textFont || 'Impact';
-      ctx.font = `${weight} ${this.textSize}px "${font}", "Arial Black", sans-serif`;
+      ctx.font = this._textFontString();
       ctx.textBaseline = 'top';
       ctx.lineWidth = Math.max(2, this.textSize * 0.08);
       ctx.strokeStyle = '#000000';
@@ -368,6 +425,12 @@
       ctx.strokeText(text, x, y);
       ctx.fillText(text, x, y);
       ctx.restore();
+    }
+
+    _textFontString() {
+      const weight = this.textBold ? '900' : '400';
+      const font = this.textFont || 'Impact';
+      return `${weight} ${this.textSize}px "${font}", "Arial Black", sans-serif`;
     }
 
     _flood(sx, sy) {
@@ -444,6 +507,8 @@
     }
 
     undo() {
+      // Undo while placing = take the item back off, nothing more.
+      if (this._placement) { this.cancelPlacement(); return; }
       if (this.undoStack.length <= 1) return;
       const current = this.undoStack.pop();
       this.redoStack.push(current);
@@ -452,6 +517,7 @@
     }
 
     redo() {
+      this.commitPlacement();
       if (this.redoStack.length === 0) return;
       const img = this.redoStack.pop();
       this.undoStack.push(img);
@@ -459,12 +525,15 @@
     }
 
     clear() {
+      this.cancelPlacement();
       this._fillBackground('#ffffff');
       this._pushUndo();
     }
 
     // Load a previous PNG (when switching tasks).
     loadPng(dataUrl) {
+      // Never let a placement's snapshot leak onto a different task.
+      this.cancelPlacement();
       return new Promise((resolve) => {
         if (!dataUrl) {
           this._fillBackground('#ffffff');
@@ -493,6 +562,7 @@
     }
 
     toDataURL() {
+      this.commitPlacement();
       // Downscale on export so the server cap (~1.5MB) is never breached even
       // if the canvas is busy. The canvas itself stays at full 1280x720 for
       // drawing precision.

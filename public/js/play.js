@@ -590,6 +590,8 @@
       btn.onclick = () => {
         document.querySelectorAll('.tool').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
+        // Switching tools finishes any text/sticker still being placed.
+        canvas.commitPlacement();
         canvas.tool = btn.dataset.tool;
       };
     });
@@ -646,12 +648,20 @@
     if (state.drawing._keyHandler) document.removeEventListener('keydown', state.drawing._keyHandler);
     state.drawing._keyHandler = (ev) => {
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
-      const tag = (ev.target.tagName || '').toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (!document.getElementById('text-modal')?.hidden) return;
+      // Only skip while actually typing. Sliders, color pickers and buttons
+      // keep focus after a click, and used to swallow every shortcut.
+      const t = ev.target;
+      const tag = (t.tagName || '').toLowerCase();
+      const typing = tag === 'textarea' || tag === 'select' || t.isContentEditable ||
+        (tag === 'input' && !['range', 'color', 'checkbox', 'radio', 'button'].includes(t.type));
+      if (typing) return;
       const tool = shortcuts[ev.key.toLowerCase()];
       if (!tool) return;
       const btn = document.querySelector(`.tool[data-tool="${tool}"]`);
-      if (btn) btn.click();
+      if (!btn) return;
+      ev.preventDefault();
+      btn.click();
     };
     document.addEventListener('keydown', state.drawing._keyHandler);
   }
@@ -685,14 +695,16 @@
       const card = document.createElement('div');
       card.className = 'vs-card';
       const label = String.fromCharCode(65 + i);
-      const creator = t.persona || m.title.persona || '';
+      // Creator names stay hidden while voting so nobody votes for a friend;
+      // they're revealed alongside the results.
+      const creator = hasResults ? (t.persona || m.title.persona || '') : '';
       const creatorInitial = (creator || '?').replace(/^(a|an|the|your|my)\s+/i,'').charAt(0).toUpperCase();
       const ytMeta = `
         <div class="vs-yt-meta">
-          <div class="vs-yt-avatar">${creatorInitial}</div>
+          <div class="vs-yt-avatar">${hasResults ? creatorInitial : label}</div>
           <div class="vs-yt-text">
             <div class="vs-yt-title">${escapeHtml(m.title.title)}</div>
-            <div class="vs-yt-channel">${escapeHtml(creator)}</div>
+            ${creator ? `<div class="vs-yt-channel">${escapeHtml(creator)}</div>` : ''}
           </div>
         </div>
       `;
@@ -824,7 +836,14 @@
         card.onclick = () => {
           socket.emit('submit-browse-vote', { category: 'bestThumb', conceptId: t.id }, (res) => {
             if (res && res.error) return showToast(res.error);
-            showToast('Voted for Best Thumbnail!');
+            const titleDone = (state.public.browse?.votedBy?.bestTitle || []).includes(state.playerId);
+            if (titleDone) return showToast('Voted for Best Thumbnail!');
+            showToast('Thumbnail vote in! Now pick the best title ↓');
+            // The page re-renders on every broadcast, so look the section up fresh.
+            setTimeout(() => {
+              document.getElementById('browse-title-section')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 150);
           });
         };
       }
@@ -859,6 +878,21 @@
     document.getElementById('browse-title-status').textContent = titleVoted
       ? '✓ Voted. Tap a different one to change.'
       : '';
+
+    // Step tracker: shows which of the two votes are still outstanding, and
+    // highlights the title section once the thumbnail vote is done.
+    const steps = [
+      ['browse-step-thumb', 'browse-thumb-section', thumbVoted, '1'],
+      ['browse-step-title', 'browse-title-section', titleVoted, '2']
+    ];
+    for (const [stepId, sectionId, done, n] of steps) {
+      const step = document.getElementById(stepId);
+      step.classList.toggle('done', done);
+      step.querySelector('.browse-step-check').textContent = done ? '✓' : n;
+      document.getElementById(sectionId).classList.toggle('done', done);
+    }
+    document.getElementById('browse-title-section')
+      .classList.toggle('needs-vote', thumbVoted && !titleVoted && concepts.some((c) => c.writerId !== state.playerId));
   }
 
   function renderResults() {

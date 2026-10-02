@@ -122,7 +122,7 @@
     const m = v.matchup;
     document.getElementById('host-vote-title').textContent = m.title.title;
     document.getElementById('host-vote-sub').textContent =
-      `Matchup ${v.index + 1} / ${v.total} · persona: ${m.title.persona} · Which video would you click?`;
+      `Matchup ${v.index + 1} / ${v.total} · Which video would you click?`;
     const row = document.getElementById('host-thumb-row');
     row.innerHTML = '';
     row.classList.toggle('vs-3', m.thumbnails.length >= 3);
