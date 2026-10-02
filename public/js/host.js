@@ -216,14 +216,21 @@
         footer = `
           <div class="host-thumb-result">
             <span class="host-thumb-votes">${won ? '🏆 ' : ''}${count} vote${count === 1 ? '' : 's'}</span>
-            <span class="host-thumb-artist">drawn by ${escapeHtml(nameOf(t.artistId))}</span>
           </div>`;
       }
+      // Mixed matchups (titles that lost a drawer) show each card's own
+      // video title and creator under the thumbnail, YouTube-style.
+      const caption = m.mixed && t.title ? `
+          <div class="host-thumb-caption">
+            <div class="host-thumb-caption-title">${escapeHtml(t.title.title)}</div>
+            <div class="host-thumb-caption-creator">${escapeHtml(t.title.persona || '')} ✔</div>
+          </div>` : '';
       card.innerHTML = `
         <div class="host-thumb-img">
           <img src="${t.png}" alt="Thumbnail ${label}" />
           <span class="host-thumb-label">${label}</span>
         </div>
+        ${caption}
         ${footer}
         ${reveal ? `<div class="reveal-cover" aria-hidden="true"><span>${label}</span></div>` : ''}
       `;
@@ -237,12 +244,16 @@
     const sub = document.getElementById('host-vote-sub');
     if (!m || !sub) return;
     const voted = (m.votedBy || []).length;
+    // The creator (channel) always shows; player names never do here.
+    const creator = !m.mixed && m.title.persona
+      ? `<span class="host-vote-creator">${escapeHtml(m.title.persona)} ✔</span> · ` : '';
+    const head = `${creator}Matchup ${v.index + 1} / ${v.total}`;
     if (m.results) {
-      sub.innerHTML = `Matchup ${v.index + 1} / ${v.total} · <strong>${escapeHtml(m.title.persona || '')}</strong> · title by ${escapeHtml(nameOf(m.writerId))}`;
+      sub.innerHTML = `${head} · Results`;
     } else if (m.thumbnails.length <= 1) {
-      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Solo thumbnail — no vote this time`;
+      sub.innerHTML = `${head} · Only one thumbnail this time — no vote`;
     } else {
-      sub.textContent = `Matchup ${v.index + 1} / ${v.total} · Which video would you click? · ${voted}/${m.eligibleCount || 0} voted`;
+      sub.innerHTML = `${head} · Which video would you click? · ${voted}/${m.eligibleCount || 0} voted`;
     }
   }
 
@@ -305,6 +316,7 @@
         card.innerHTML = `
           ${t.png ? `<img src="${t.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
           <div class="browse-title">${escapeHtml(c.title.title)}</div>
+          ${c.title.persona ? `<div class="browse-creator">${escapeHtml(c.title.persona)} ✔</div>` : ''}
         `;
         grid.appendChild(card);
       }

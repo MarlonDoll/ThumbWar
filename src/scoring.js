@@ -54,7 +54,8 @@ function scoreMatchups(voteTallies, scores) {
       const onlyThisGotVotes = Object.keys(tally.votes).every(
         (id) => id === winnerId || (tally.votes[id] || 0) === 0
       );
-      if (onlyThisGotVotes && winning) {
+      // Mixed matchups (different titles) have no single writer to reward.
+      if (onlyThisGotVotes && winning && tally.writerId) {
         scores[tally.writerId] =
           (scores[tally.writerId] || 0) + POINTS.UNANIMOUS_TITLE_BONUS;
       }

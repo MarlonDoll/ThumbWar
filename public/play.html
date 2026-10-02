@@ -100,21 +100,21 @@
                   </select>
                 </label>
                 <label class="setting-ctl">
-                  <span class="setting-label">🎨 Drawing</span>
+                  <span class="setting-label">🎨 Drawing (each thumbnail)</span>
                   <select id="cfg-draw">
-                    <option value="90">1.5 min</option>
+                    <option value="45">45 sec</option>
+                    <option value="60">1 min</option>
+                    <option value="90" selected>1.5 min</option>
                     <option value="120">2 min</option>
-                    <option value="180" selected>3 min</option>
-                    <option value="240">4 min</option>
-                    <option value="300">5 min</option>
-                    <option value="420">7 min</option>
+                    <option value="180">3 min</option>
                   </select>
                 </label>
                 <label class="setting-ctl">
                   <span class="setting-label">🗳️ Voting</span>
                   <select id="cfg-vote">
-                    <option value="15">15 sec</option>
-                    <option value="25" selected>25 sec</option>
+                    <option value="10">10 sec</option>
+                    <option value="15" selected>15 sec</option>
+                    <option value="25">25 sec</option>
                     <option value="40">40 sec</option>
                     <option value="60">1 min</option>
                   </select>
@@ -141,8 +141,8 @@
                 <label class="setting-ctl">
                   <span class="setting-label">⚔️ Matchups</span>
                   <select id="cfg-matchup">
-                    <option value="2" selected>1v1 (2 thumbnails)</option>
-                    <option value="3">3-way (3 thumbnails, 6+ players)</option>
+                    <option value="3" selected>3-way with 6+ players, else 1v1</option>
+                    <option value="2">Always 1v1</option>
                   </select>
                 </label>
               </div>
@@ -150,7 +150,7 @@
 
             <div class="settings-card" id="hall-settings">
               <label class="spectator-toggle">
-                <input type="checkbox" id="cfg-hall" /> Feature our best thumbnail in the Hall of Thumbs
+                <input type="checkbox" id="cfg-hall" checked /> Feature our best thumbnail in the Hall of Thumbs
               </label>
               <p class="muted tiny">Shows the winning drawing, its title and players' names on the public homepage.</p>
             </div>
@@ -184,7 +184,7 @@
 
     <template id="tpl-writing">
       <section class="writing panel">
-        <div class="step-pill">STEP 1 / 2 · WRITE</div>
+        <div class="step-pill">STEP 1 / 2 · WRITE <span class="round-tag"></span></div>
         <h1 class="phase-headline">WRITE A <span class="highlight-cyan">BANGER</span> TITLE</h1>
         <p class="phase-sub caveat">...the kind your nan would 100% click on.</p>
 
@@ -218,11 +218,15 @@
 
     <template id="tpl-drawing">
       <section class="drawing panel">
-        <div class="step-pill">STEP 2 / 2 · DRAW</div>
+        <div class="step-pill">STEP 2 / 2 · DRAW <span class="round-tag"></span></div>
         <div class="drawing-banner">
-          <div>
-            <span class="drawing-banner-label">🎨 You're drawing the thumbnail for:</span>
-            <div class="drawing-banner-title" id="banner-title">...</div>
+          <div class="banner-yt">
+            <div class="banner-avatar" id="banner-dot">YT</div>
+            <div class="banner-yt-text">
+              <span class="drawing-banner-label">🎨 Draw the thumbnail · <span id="banner-step">Drawing 1 of 1</span></span>
+              <div class="drawing-banner-title" id="banner-title">...</div>
+              <div class="banner-channel"><span id="banner-persona"></span><span class="banner-verified" aria-hidden="true">✔</span><span class="banner-views" id="banner-views"></span></div>
+            </div>
           </div>
           <span class="task-pager">
             <button class="btn btn-ghost btn-sm" id="prev-task">◀</button>

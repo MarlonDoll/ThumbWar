@@ -2332,3 +2332,60 @@ textarea.input-xl {
 @media (max-width: 720px) {
   .tv-card-actions .btn { flex: 1 1 100%; }
 }
+
+/* ================= YouTube-style creator rows ================= */
+.banner-yt { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.banner-avatar {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--yt-red);
+  font-weight: 900;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.banner-yt-text { min-width: 0; }
+.banner-channel {
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+.banner-verified {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  font-size: 9px;
+  vertical-align: 1px;
+}
+.banner-views { font-weight: 500; opacity: 0.85; }
+.vs-yt-meta { position: relative; }
+.vs-yt-label {
+  margin-left: auto;
+  align-self: flex-start;
+  font-weight: 900;
+  color: var(--muted);
+  font-size: 13px;
+}
+.vs-yt-channel { color: var(--muted); }
+.vs-yt-channel .banner-verified { background: var(--muted); color: #111; }
+.browse-creator { padding: 0 14px 10px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.host-thumb-caption { padding: 12px 18px 4px; text-align: left; }
+.host-thumb-caption-title { font-size: 24px; font-weight: 800; line-height: 1.2; }
+.host-thumb-caption-creator { color: var(--muted); font-size: 18px; margin-top: 2px; }
+.host-vote-creator { color: var(--text); font-weight: 800; }
+.round-tag { opacity: 0.8; }
+@media (max-width: 720px) {
+  .banner-avatar { width: 36px; height: 36px; font-size: 13px; }
+  .banner-channel { font-size: 13px; }
+  .browse-creator { padding: 0 8px 8px; font-size: 11px; }
+}

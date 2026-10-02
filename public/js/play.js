@@ -151,6 +151,11 @@
     const tpl = document.getElementById(id);
     app.innerHTML = '';
     app.appendChild(tpl.content.cloneNode(true));
+    // "· ROUND 2 OF 3" on the step pills, so it's clear how many are left.
+    const total = state.public?.totalRounds || 1;
+    app.querySelectorAll('.round-tag').forEach((el) => {
+      el.textContent = total > 1 ? `· ROUND ${(state.public.currentRound || 0) + 1} OF ${total}` : '';
+    });
   }
 
   function me() {
@@ -221,7 +226,7 @@
       const rounds = cfg.ROUNDS || 3;
       summary.innerHTML = `
         <h3 class="settings-title">This game</h3>
-        <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 180)} drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 25)} per vote</p>
+        <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 90)} per drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 15)} per vote</p>
         ${cfg.MATCHUP_SIZE === 3 ? '<p class="muted tiny">⚔️ 3-way matchups (with 6+ players): you\'ll draw 3 thumbnails a round.</p>' : ''}
         ${cfg.SHARE_HALL ? '<p class="muted tiny">📸 The best thumbnail will be featured in the Hall of Thumbs.</p>' : ''}
       `;
@@ -237,11 +242,11 @@
         if (el) el.value = String(val);
       };
       setVal('cfg-write', cfg.WRITE_SECONDS || 45);
-      setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
-      setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
+      setVal('cfg-draw', cfg.DRAW_SECONDS || 90);
+      setVal('cfg-vote', cfg.VOTE_SECONDS || 15);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
-      setVal('cfg-matchup', cfg.MATCHUP_SIZE || 2);
+      setVal('cfg-matchup', cfg.MATCHUP_SIZE || 3);
       document.getElementById('cfg-matchup').onchange = (e) => {
         socket.emit('set-timers', { matchup: e.target.value });
       };
@@ -278,7 +283,7 @@
       };
       const threeWayShort = (state.public.config?.MATCHUP_SIZE === 3) && activeCount < 6;
       hostHint.textContent = `${activeCount} player${activeCount === 1 ? '' : 's'} ready — workload auto-assigns on start.` +
-        (threeWayShort ? ' 3-way needs 6+ players, so rounds will be 1v1 until then.' : '');
+        (threeWayShort ? ' Matchups are 1v1 until there are 6+ players.' : '');
     } else {
       startBtn.hidden = true;
       hostHint.textContent = 'Waiting for the host to start…';
@@ -389,6 +394,45 @@
     statusEl.textContent = `${mine}${submittedCount}/${total} players submitted`;
   }
 
+  function creatorInitials(persona) {
+    return (persona || '?')
+      .replace(/^(a|an|the|your|my)\s+/i, '')
+      .split(/\s+/)
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '?';
+  }
+
+  // Stable, silly YouTube-ish stats for a title (same title → same numbers).
+  function titleHash(str) {
+    let h = 0;
+    for (const ch of String(str)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return h;
+  }
+  function fakeViews(title) {
+    const n = 1000 + (titleHash(title) % 9_000_000);
+    return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1000)}K`;
+  }
+  function fakeAge(title) {
+    const ages = ['2 hours ago', '5 hours ago', '1 day ago', '3 days ago', '1 week ago', '2 weeks ago'];
+    return ages[titleHash(title + '!') % ages.length];
+  }
+
+  // Deadlines for each of my drawings: drawing i ends (i + 1) slots after
+  // drawing started. Someone who joined late gets slots counted from when
+  // their tasks arrived. Never past the end of the phase.
+  function drawingSlots() {
+    const d = state.public?.drawing;
+    if (!d || !d.startedAt || !d.perDrawingSeconds || !getTasks().length) return null;
+    const per = d.perDrawingSeconds * 1000;
+    if (!state.drawing.tasksSeenAt) state.drawing.tasksSeenAt = Date.now() + (state.clockOffset || 0);
+    const base = state.drawing.tasksSeenAt > d.startedAt + per ? state.drawing.tasksSeenAt : d.startedAt;
+    const phaseEnd = state.public.timerEndsAt || Infinity;
+    return { end: (i) => Math.min(base + (i + 1) * per, phaseEnd) };
+  }
+
   function getTasks() {
     return state.private?.tasks || [];
   }
@@ -439,6 +483,7 @@
         clearInterval(state.drawing._autoSubmitInterval);
         return;
       }
+      checkDrawingSlots();
       if (state.drawing._autoSubmitted) return;
       if (!state.public.timerEndsAt) return;
       const remaining = state.public.timerEndsAt - (Date.now() + (state.clockOffset || 0));
@@ -460,6 +505,36 @@
         showToast('Auto-submitted drawings (time almost up)');
       }
     }, 1000);
+
+    // Each drawing has its own countdown (slot). When a slot runs out, that
+    // drawing is submitted as it is and you move on to the next one.
+    function checkDrawingSlots() {
+      const tasks = getTasks();
+      const slots = drawingSlots();
+      if (!slots) return;
+      const now = Date.now() + (state.clockOffset || 0);
+      state.drawing.slotDone = state.drawing.slotDone || {};
+      tasks.forEach((t, i) => {
+        if (t.submitted || state.drawing.slotDone[t.writerId] || now < slots.end(i)) return;
+        state.drawing.slotDone[t.writerId] = true;
+        const active = i === state.drawing.activeIndex;
+        if (active) {
+          state.drawing.cachedPngs[t.writerId] = canvas.toDataURL();
+          state.drawing.cachedStates[t.writerId] = canvas.getState();
+        }
+        const png = state.drawing.cachedPngs[t.writerId];
+        if (png) socket.emit('submit-drawing', { writerId: t.writerId, png });
+        if (!active) return;
+        const next = tasks.findIndex((x, j) => j > i && !x.submitted);
+        if (next >= 0) {
+          state.drawing.activeIndex = next;
+          loadActiveTask();
+          showToast(`⏰ Time's up for drawing ${i + 1} — on to drawing ${next + 1}!`);
+        } else {
+          showToast('⏰ Time\'s up — drawing submitted');
+        }
+      });
+    }
 
     function switchTask(delta) {
       const tasks = getTasks();
@@ -496,18 +571,18 @@
       if (bannerTitle) bannerTitle.textContent = t.title.title;
       if (personaEl) personaEl.textContent = t.title.persona;
       if (labelEl) labelEl.textContent = `${state.drawing.activeIndex + 1} / ${tasks.length}`;
+      const initials = creatorInitials(t.title.persona);
       const dotEl = document.getElementById('drawing-dot');
-      if (dotEl) {
-        const initials = (t.title.persona || '?')
-          .replace(/^(a|an|the|your|my)\s+/i, '')
-          .split(/\s+/)
-          .map((w) => w[0])
-          .filter(Boolean)
-          .slice(0, 2)
-          .join('')
-          .toUpperCase() || '?';
-        dotEl.textContent = initials;
-      }
+      if (dotEl) dotEl.textContent = initials;
+      // YouTube-style row in the banner: avatar, title, then the creator.
+      const bannerDot = document.getElementById('banner-dot');
+      if (bannerDot) bannerDot.textContent = initials;
+      const bannerPersona = document.getElementById('banner-persona');
+      if (bannerPersona) bannerPersona.textContent = t.title.persona || 'Unknown creator';
+      const bannerViews = document.getElementById('banner-views');
+      if (bannerViews) bannerViews.textContent = ` · ${fakeViews(t.title.title)} views · ${fakeAge(t.title.title)}`;
+      const bannerStep = document.getElementById('banner-step');
+      if (bannerStep) bannerStep.textContent = `Drawing ${state.drawing.activeIndex + 1} of ${tasks.length}`;
       // Only reload the canvas when switching to a different task.
       // Reloading on every state update wipes whatever the player is drawing.
       if (state.drawing._loadedWriterId !== t.writerId) {
@@ -691,6 +766,7 @@
     const nameOf = (id) => state.public.players.find((p) => p.id === id)?.name || state.public.names?.[id] || 'Unknown';
     document.getElementById('vote-title-row').textContent =
       `Matchup ${voting.index + 1} of ${voting.total}`;
+    const solo = m.thumbnails.length <= 1;
     document.getElementById('vote-progress').textContent = '';
 
     const arena = document.getElementById('thumb-choices');
@@ -727,19 +803,18 @@
       card.className = 'vs-card';
       card.style.setProperty('--d', `${delays.card(i)}s`);
       const label = String.fromCharCode(65 + i);
-      // Creator and artist names stay hidden while voting so nobody votes
-      // for a friend; they're revealed alongside the results.
-      const creator = hasResults ? (m.title.persona || '') : '';
-      const artist = hasResults && t.artistId ? nameOf(t.artistId) : '';
-      const creatorInitial = (creator || '?').replace(/^(a|an|the|your|my)\s+/i,'').charAt(0).toUpperCase();
+      // The video's creator (channel) always shows, like on YouTube. Player
+      // names never appear while voting, so nobody votes for a friend.
+      const video = (m.mixed && t.title) ? t.title : m.title;
+      const creator = video.persona || '';
       const ytMeta = `
         <div class="vs-yt-meta">
-          <div class="vs-yt-avatar">${hasResults ? creatorInitial : label}</div>
+          <div class="vs-yt-avatar">${escapeHtml(creatorInitials(creator))}</div>
           <div class="vs-yt-text">
-            <div class="vs-yt-title">${escapeHtml(m.title.title)}</div>
-            ${creator ? `<div class="vs-yt-channel">${escapeHtml(creator)}</div>` : ''}
-            ${artist ? `<div class="vs-yt-artist">drawn by ${escapeHtml(artist)}</div>` : ''}
+            <div class="vs-yt-title">${escapeHtml(video.title)}</div>
+            ${creator ? `<div class="vs-yt-channel">${escapeHtml(creator)} <span class="banner-verified">✔</span> · ${fakeViews(video.title)} views</div>` : ''}
           </div>
+          <span class="vs-yt-label">${label}</span>
         </div>
       `;
 
@@ -757,11 +832,11 @@
         `;
       } else {
         const mine = myThumbIds().includes(t.id);
-        const iDrewOne = m.thumbnails.some((x) => myThumbIds().includes(x.id));
+        const iDrewOne = solo || m.thumbnails.some((x) => myThumbIds().includes(x.id));
         card.innerHTML = `
           <img src="${t.png}" alt="Thumbnail ${label}" />
           ${ytMeta}
-          <button class="btn btn-primary vote-btn" data-thumb="${t.id}" ${alreadyVoted || iDrewOne ? 'disabled' : ''}>${mine ? 'Your thumbnail' : iDrewOne ? 'Rival' : "I'd click this"}</button>
+          <button class="btn btn-primary vote-btn" data-thumb="${t.id}" ${alreadyVoted || iDrewOne ? 'disabled' : ''}>${mine ? 'Your thumbnail' : solo ? 'Only one thumbnail — no vote' : iDrewOne ? 'Rival' : "I'd click this"}</button>
           ${reveal ? `<div class="reveal-cover" aria-hidden="true"><span>${label}</span></div>` : ''}
         `;
         if (!iDrewOne) {
@@ -902,6 +977,7 @@
       card.innerHTML = `
         ${t.png ? `<img src="${t.png}" alt="" loading="lazy" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
+          ${c.title.persona ? `<div class="browse-creator">${escapeHtml(c.title.persona)} ✔</div>` : ''}
         ${isMyArt ? '<div class="browse-yours">Your art</div>' : ''}
       `;
       if (!isMyArt) {
@@ -932,6 +1008,7 @@
       card.dataset.voteId = c.id;
       card.innerHTML = `
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
+          ${c.title.persona ? `<div class="browse-creator">${escapeHtml(c.title.persona)} ✔</div>` : ''}
         ${isMyTitle ? '<div class="browse-yours">Your title</div>' : ''}
       `;
       if (!isMyTitle) {
@@ -1173,13 +1250,23 @@
       return;
     }
     const skew = state.clockOffset || 0;
-    const remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));
+    let remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));
+    let drawPrefix = '';
+    if (state.public.phase === 'drawing' && state.drawing?.canvas) {
+      const slots = drawingSlots();
+      const tasks = getTasks();
+      const i = state.drawing.activeIndex;
+      if (slots && tasks[i] && !tasks[i].submitted) {
+        remaining = Math.max(0, Math.round((slots.end(i) - (Date.now() + skew)) / 1000));
+        if (tasks.length > 1) drawPrefix = `✏️${i + 1}/${tasks.length} `;
+      }
+    }
     timerPill.hidden = false;
     const totalRounds = state.public.totalRounds || 1;
     const roundPrefix = totalRounds > 1
       ? `R${(state.public.currentRound || 0) + 1}/${totalRounds} `
       : '';
-    timerPill.textContent = roundPrefix + formatTime(remaining);
+    timerPill.textContent = (drawPrefix || roundPrefix) + formatTime(remaining);
     timerPill.classList.toggle('urgent', remaining <= 10);
     maybeTick(remaining, state.public.phase);
     maybeWarn(remaining, state.public.phase);

@@ -17,19 +17,20 @@ const PHASES = {
 
 const DEFAULTS = {
   WRITE_SECONDS: 45,
-  DRAW_SECONDS: 180,
-  VOTE_SECONDS: 25,
+  // Per thumbnail: each drawing gets its own countdown.
+  DRAW_SECONDS: 90,
+  VOTE_SECONDS: 15,
   BROWSE_SECONDS: 30,
   ROUNDS: 3,
   // 2 = 1v1 matchups, 3 = three-way. Three-way only kicks in with enough
   // players that each matchup still has several voters.
-  MATCHUP_SIZE: 2,
+  MATCHUP_SIZE: 3,
   // Off unless the host opts in: winners appear on the public homepage.
-  SHARE_HALL: false
+  SHARE_HALL: true
 };
 
 // How long the winner reveal stays on screen between matchups.
-const REVEAL_MS = 3500;
+const REVEAL_MS = 2500;
 // A matchup nobody is able to vote on (everyone left is one of its artists)
 // is still shown briefly instead of waiting out the full vote timer.
 const NO_VOTERS_SECONDS = 5;
@@ -97,15 +98,17 @@ class RoomManager {
   join(code, name) {
     const room = this.get(code);
     if (!room) return { error: 'Room not found' };
-    if (room.phase !== PHASES.LOBBY) {
-      return { error: 'Game already in progress' };
+    const trimmed = (name || '').trim().slice(0, 20) || 'Player';
+    const same = room.players.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (same) {
+      // Rejoining with your own name (refreshed, lost the tab, new phone)
+      // takes your spot back — scores and all — as long as that player
+      // isn't currently connected somewhere else.
+      if (!same.connected) return { room, playerId: same.id, reclaimed: true };
+      return { error: 'That name is taken in this room' };
     }
     if (room.players.length >= 30) {
       return { error: 'Room is full (max 30)' };
-    }
-    const trimmed = (name || '').trim().slice(0, 20) || 'Player';
-    if (room.players.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) {
-      return { error: 'That name is taken in this room' };
     }
     const id = uid('p');
     room.names[id] = trimmed;
@@ -184,12 +187,40 @@ class RoomManager {
 
   // Someone (re)connecting while titles are being written who isn't part of
   // this round yet (they were offline when it started) gets added to it.
+  // Bring someone who (re)joins mid-round into it instead of leaving them
+  // waiting for the next round:
+  //  - writing: they write a title like everyone else;
+  //  - drawing: they get thumbnails to draw, preferring titles that are
+  //    short of drawers (someone dropped out), with the time that's left.
   ensureInRound(room, playerId) {
-    if (room.phase !== PHASES.WRITING || !room.round) return;
+    if (!room.round) return;
     const p = room.players.find((x) => x.id === playerId);
-    if (!p || p.spectator || room.round.writers.includes(playerId)) return;
-    room.round.writers.push(playerId);
-    room.round.suggestions[playerId] = { personas: pickRandomPersonas(5), formats: pickRandomFormats(6) };
+    if (!p || p.spectator) return;
+    if (room.phase === PHASES.WRITING) {
+      if (room.round.writers.includes(playerId)) return;
+      room.round.writers.push(playerId);
+      room.round.suggestions[playerId] = { personas: pickRandomPersonas(5), formats: pickRandomFormats(6) };
+      return;
+    }
+    if (room.phase !== PHASES.DRAWING) return;
+    const tasks = room.round.drawTasks || (room.round.drawTasks = {});
+    if ((tasks[playerId] || []).length) return;
+    const connected = new Set(this._connectedActive(room).map((x) => x.id));
+    const size = room.round.matchupSize || 2;
+    const candidates = Object.keys(room.round.assignments || {})
+      .filter((w) => w !== playerId && room.round.titles[w])
+      .map((w) => {
+        const drawers = room.round.assignments[w];
+        const done = (room.round.drawings[w] || []).length;
+        const pending = drawers.filter((d) => connected.has(d) && !(room.round.drawings[w] || []).some((x) => x.artistId === d)).length;
+        return { w, expected: done + pending };
+      })
+      .sort((a, b) => a.expected - b.expected || Math.random() - 0.5);
+    const short = candidates.filter((c) => c.expected < size);
+    const picks = (short.length ? short : candidates).slice(0, short.length ? Math.min(size, short.length) : 1);
+    if (!picks.length) return;
+    tasks[playerId] = picks.map((c) => c.w);
+    for (const c of picks) room.round.assignments[c.w].push(playerId);
   }
 
   submitTitle(room, playerId, payload) {
@@ -247,7 +278,12 @@ class RoomManager {
     room.round.assignments = buildAssignments(titleWriters, drawers, { size });
     room.round.drawTasks = drawTasksByPlayer(room.round.assignments);
     room.phase = PHASES.DRAWING;
-    this._startTimer(room, room.config.DRAW_SECONDS, () => this._finishDrawing(room));
+    // Each thumbnail gets its own DRAW_SECONDS slot, one after another; the
+    // phones count down the current drawing and auto-submit at its slot end.
+    const perPlayer = Math.max(1, ...Object.values(room.round.drawTasks).map((t) => t.length));
+    room.round.drawSlots = perPlayer;
+    room.round.drawStartedAt = Date.now();
+    this._startTimer(room, room.config.DRAW_SECONDS * perPlayer + 2, () => this._finishDrawing(room));
   }
 
   submitDrawing(room, playerId, writerId, png) {
@@ -292,23 +328,46 @@ class RoomManager {
     if (room.phase !== PHASES.DRAWING) return;
     this._clearTimer(room);
 
-    // Build voting queue — only for titles that have at least 1 thumbnail.
-    // Titles with no submissions (all assigned drawers dropped) are skipped.
+    // Build the voting queue. Titles with no thumbnails (all their drawers
+    // dropped) are skipped. Titles left with a single thumbnail (a drawer
+    // dropped out) are paired with each other into a "which video would you
+    // click?" matchup where each card keeps its own title, instead of a
+    // pointless one-thumbnail matchup.
     const queue = [];
+    const singles = [];
     for (const writerId of Object.keys(room.round.assignments || {})) {
       const title = room.round.titles[writerId];
       if (!title) continue;
       const thumbs = (room.round.drawings[writerId] || []).slice();
       if (thumbs.length === 0) continue;
+      if (thumbs.length === 1) { singles.push({ ...thumbs[0], title }); continue; }
       thumbs.sort(() => Math.random() - 0.5);
-      queue.push({
-        writerId,
-        title,
-        thumbnails: thumbs,
-        votes: {},
-        votedBy: new Set()
-      });
+      queue.push({ writerId, title, thumbnails: thumbs, votes: {}, votedBy: new Set() });
     }
+    singles.sort(() => Math.random() - 0.5);
+    while (singles.length) {
+      // Pairs; an odd one out joins the last pair as a three-way.
+      const take = singles.length === 3 ? 3 : Math.min(2, singles.length);
+      const group = singles.splice(0, take);
+      if (group.length === 1) {
+        // A lone thumbnail with no other lone one to pair with joins the
+        // smallest regular matchup as an extra card (with its own title), so
+        // it still gets voted on. Only if there's nothing else at all does it
+        // stand alone.
+        const host = queue.filter((m) => !m.mixed).sort((a, b) => a.thumbnails.length - b.thumbnails.length)[0];
+        if (host) {
+          host.thumbnails = host.thumbnails.map((t) => ({ ...t, title: host.title })).concat(group);
+          host.mixed = true;
+          host.writerId = null;
+          host.title = null;
+        } else {
+          queue.push({ writerId: group[0].writerId, title: group[0].title, thumbnails: group, votes: {}, votedBy: new Set() });
+        }
+      } else {
+        queue.push({ writerId: null, mixed: true, title: null, thumbnails: group, votes: {}, votedBy: new Set() });
+      }
+    }
+    queue.sort(() => Math.random() - 0.5);
     room.round.voting = queue;
     room.round.voteIndex = 0;
     room.phase = PHASES.VOTING;
@@ -361,6 +420,7 @@ class RoomManager {
     if (!m) return { error: 'No active matchup' };
     // Reveal in progress — voting is closed for this matchup.
     if (m.results) return { error: 'Voting closed for this matchup' };
+    if (m.thumbnails.length <= 1) return { error: 'Only one thumbnail here — no vote needed' };
     if (m.votedBy.has(playerId)) return { error: 'Already voted' };
     const target = m.thumbnails.find((t) => t.id === thumbnailId);
     if (!target) return { error: 'Unknown thumbnail' };
@@ -492,7 +552,21 @@ class RoomManager {
     }
 
     // Last round — build browse page from ALL rounds' matchup results
-    const concepts = room.allMatchupResults.map((r) => {
+    // Mixed matchups (several titles, one thumbnail each) become one entry
+    // per title, so every title appears on its own on the browse page.
+    const entries = room.allMatchupResults.flatMap((r) => {
+      if (r.writerId) return [r];
+      const byTitle = new Map();
+      for (const t of r.thumbnails) {
+        if (!byTitle.has(t.writerId)) byTitle.set(t.writerId, { writerId: t.writerId, title: t.title, thumbnails: [], votes: {}, winners: [] });
+        const e = byTitle.get(t.writerId);
+        e.thumbnails.push(t);
+        e.votes[t.id] = r.votes[t.id] || 0;
+        if (r.winners.includes(t.id)) e.winners.push(t.id);
+      }
+      return [...byTitle.values()];
+    });
+    const concepts = entries.map((r) => {
       let winnerId = r.winners[0];
       if (!winnerId && r.thumbnails.length > 0) winnerId = r.thumbnails[0].id;
       const winningThumb = r.thumbnails.find((t) => t.id === winnerId) || r.thumbnails[0] || null;
@@ -668,7 +742,7 @@ class RoomManager {
           const onlyOne = Object.keys(r.votes).every(
             (id) => id === winners[0] || (r.votes[id] || 0) === 0
           );
-          if (onlyOne && stats[r.writerId]) {
+          if (onlyOne && r.writerId && stats[r.writerId]) {
             stats[r.writerId].unanimousTitles += 1;
           }
         }
@@ -808,6 +882,9 @@ class RoomManager {
       }
       base.drawing = {
         assignedByDrawer,
+        perDrawingSeconds: room.config.DRAW_SECONDS,
+        slots: room.round.drawSlots || 1,
+        startedAt: room.round.drawStartedAt || null,
         totalTasks: Object.values(room.round.drawTasks || {}).reduce(
           (s, arr) => s + arr.length,
           0
@@ -826,11 +903,13 @@ class RoomManager {
         matchup: m
           ? {
               writerId: m.writerId,
-              title: m.title,
+              mixed: !!m.mixed,
+              title: m.title || { title: 'Which video would you click?', persona: '' },
               // Who drew what stays secret until the results are revealed.
               thumbnails: m.thumbnails.map((t) => ({
                 id: t.id,
                 png: this._imgUrl(room, t),
+                ...(m.mixed ? { title: t.title } : {}),
                 ...(m.results ? { artistId: t.artistId } : {})
               })),
               votedBy: [...m.votedBy],
