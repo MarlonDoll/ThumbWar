@@ -204,6 +204,7 @@
       summary.innerHTML = `
         <h3 class="settings-title">This game</h3>
         <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 180)} drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 25)} per vote</p>
+        ${cfg.MATCHUP_SIZE === 3 ? '<p class="muted tiny">⚔️ 3-way matchups (with 6+ players): you\'ll draw 3 thumbnails a round.</p>' : ''}
         ${cfg.SHARE_HALL ? '<p class="muted tiny">📸 The best thumbnail will be featured in the Hall of Thumbs.</p>' : ''}
       `;
     }
@@ -222,6 +223,10 @@
       setVal('cfg-vote', cfg.VOTE_SECONDS || 25);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
+      setVal('cfg-matchup', cfg.MATCHUP_SIZE || 2);
+      document.getElementById('cfg-matchup').onchange = (e) => {
+        socket.emit('set-timers', { matchup: e.target.value });
+      };
 
       const sendTimers = () => {
         socket.emit('set-timers', {
@@ -253,7 +258,9 @@
           if (res && res.error) showToast(res.error);
         });
       };
-      hostHint.textContent = `${activeCount} player${activeCount === 1 ? '' : 's'} ready — workload auto-assigns on start.`;
+      const threeWayShort = (state.public.config?.MATCHUP_SIZE === 3) && activeCount < 6;
+      hostHint.textContent = `${activeCount} player${activeCount === 1 ? '' : 's'} ready — workload auto-assigns on start.` +
+        (threeWayShort ? ' 3-way needs 6+ players, so rounds will be 1v1 until then.' : '');
     } else {
       startBtn.hidden = true;
       hostHint.textContent = 'Waiting for the host to start…';

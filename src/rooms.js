@@ -21,6 +21,9 @@ const DEFAULTS = {
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 30,
   ROUNDS: 3,
+  // 2 = 1v1 matchups, 3 = three-way. Three-way only kicks in with enough
+  // players that each matchup still has several voters.
+  MATCHUP_SIZE: 2,
   // Off unless the host opts in: winners appear on the public homepage.
   SHARE_HALL: false
 };
@@ -30,6 +33,8 @@ const REVEAL_MS = 3500;
 // A matchup nobody is able to vote on (everyone left is one of its artists)
 // is still shown briefly instead of waiting out the full vote timer.
 const NO_VOTERS_SECONDS = 5;
+// Three-way matchups need this many drawers; below it a round uses 1v1.
+const MIN_PLAYERS_THREE_WAY = 6;
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -227,7 +232,9 @@ class RoomManager {
     // Every title gets a matchup; whoever is still connected does the drawing.
     const titleWriters = room.round.writers.filter((id) => room.round.titles[id]);
     const drawers = room.round.writers.filter((id) => connected.has(id));
-    room.round.assignments = buildAssignments(titleWriters, drawers);
+    const size = room.config.MATCHUP_SIZE === 3 && drawers.length >= MIN_PLAYERS_THREE_WAY ? 3 : 2;
+    room.round.matchupSize = size;
+    room.round.assignments = buildAssignments(titleWriters, drawers, { size });
     room.round.drawTasks = drawTasksByPlayer(room.round.assignments);
     room.phase = PHASES.DRAWING;
     this._startTimer(room, room.config.DRAW_SECONDS, () => this._finishDrawing(room));
@@ -902,4 +909,4 @@ class RoomManager {
   }
 }
 
-module.exports = { RoomManager, PHASES };
+module.exports = { RoomManager, PHASES, MIN_PLAYERS_THREE_WAY };

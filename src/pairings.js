@@ -1,17 +1,17 @@
 // Build drawing assignments for each round.
 //
-// Every title gets its own matchup. Each title is drawn by (up to) two
-// players who didn't write it, so every player draws two thumbnails per
-// round and every title becomes a VS battle. This works the same for odd
-// and even player counts:
+// Every title gets its own matchup. Each title is drawn by `size` players
+// (2 for a 1v1, 3 for a three-way) who didn't write it, so every player
+// draws `size` thumbnails per round. This works the same for odd and even
+// player counts:
 //
 //   - Drawers are shuffled into a ring each round. The player at ring
-//     position p draws the titles written by positions p+1 and p+2, so the
-//     load is exactly 2 thumbnails each and nobody draws their own title.
+//     position p draws the titles written by positions p+1 … p+size, so the
+//     load is exactly `size` thumbnails each and nobody draws their own title.
 //   - Titles whose writer isn't drawing this round (they dropped out after
 //     submitting) are handed to the least-loaded drawers.
-//   - With only 2 drawers, each title can only be drawn by the other person,
-//     so matchups are solo reveals. With 1 player they draw their own.
+//   - With fewer drawers than that, each title gets everyone but its writer
+//     (2 drawers → solo reveals). With 1 player they draw their own.
 //
 // Returns: { [writerId]: [drawerId, ...], ... }
 
@@ -26,7 +26,7 @@ function shuffle(arr, rand) {
 
 // titleWriterIds: writers whose titles need thumbnails this round.
 // drawerIds: players available to draw (connected, not spectating).
-function buildAssignments(titleWriterIds, drawerIds, rand = Math.random) {
+function buildAssignments(titleWriterIds, drawerIds, { size = 2, rand = Math.random } = {}) {
   const assignments = {};
   const drawers = shuffle(drawerIds, rand);
   const n = drawers.length;
@@ -37,11 +37,11 @@ function buildAssignments(titleWriterIds, drawerIds, rand = Math.random) {
     return assignments;
   }
 
-  const perTitle = Math.min(2, n - 1);
+  const perTitle = Math.min(size, n - 1);
   const load = Object.fromEntries(drawers.map((d) => [d, 0]));
   const ringPos = new Map(drawers.map((d, i) => [d, i]));
 
-  // Titles from players in the ring: the two players "behind" them draw it.
+  // Titles from players in the ring: the perTitle players "behind" them draw it.
   const leftovers = [];
   for (const w of titleWriterIds) {
     if (!ringPos.has(w)) { leftovers.push(w); continue; }

@@ -134,6 +134,7 @@ io.on('connection', (socket) => {
     if (cfg.vote) room.config.VOTE_SECONDS = clamp(cfg.vote, 10, 120);
     if (cfg.browse) room.config.BROWSE_SECONDS = clamp(cfg.browse, 15, 180);
     if (typeof cfg.hall === 'boolean') room.config.SHARE_HALL = cfg.hall;
+    if (cfg.matchup) room.config.MATCHUP_SIZE = String(cfg.matchup) === '3' ? 3 : 2;
     cb && cb({ ok: true });
     broadcastState(room);
   });
