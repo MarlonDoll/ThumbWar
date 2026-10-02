@@ -43,6 +43,9 @@ app.get('/img/:code/:id', (req, res) => {
 app.use('/hall-images', express.static(hall.HALL_DIR, { maxAge: '7d' }));
 
 const rooms = new RoomManager(io);
+// How long writing/drawing waits for a dropped phone to come back before
+// carrying on without it.
+const RECONNECT_GRACE_MS = 15 * 1000;
 
 function broadcastState(room) {
   io.to(room.code).emit('state', rooms.publicState(room));
@@ -54,6 +57,18 @@ function broadcastState(room) {
 }
 
 io.on('connection', (socket) => {
+  // Any message from a player proves this socket is live: make sure the room
+  // treats them as connected on it (belt and braces for the race above).
+  socket.use((_packet, next) => {
+    const room = socket.data.roomCode && rooms.get(socket.data.roomCode);
+    const p = room && room.players.find((x) => x.id === socket.data.playerId);
+    if (p && (p.socketId !== socket.id || !p.connected)) {
+      p.socketId = socket.id;
+      p.connected = true;
+      delete p.disconnectedAt;
+    }
+    next();
+  });
   socket.data.playerId = null;
   socket.data.roomCode = null;
   socket.data.isHostDisplay = false;
@@ -93,6 +108,7 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     socket.data.playerId = playerId;
     socket.data.roomCode = room.code;
+    rooms.ensureInRound(room, playerId);
     cb({ ok: true });
     broadcastState(room);
   });
@@ -219,21 +235,31 @@ io.on('connection', (socket) => {
       return;
     }
     const p = room.players.find((x) => x.id === socket.data.playerId);
-    if (p) {
-      p.connected = false;
-      p.socketId = null;
-      p.disconnectedAt = Date.now();
-    }
+    // Phones drop and reconnect constantly (switching apps, screen lock). The
+    // new connection usually resumes before the server notices the old one
+    // died, so only mark the player offline if this was their current socket.
+    // Otherwise a late disconnect knocked live players offline: no private
+    // data (suggestions, drawing tasks) and no drawing assignments.
+    if (!p || p.socketId !== socket.id) return;
+    p.connected = false;
+    p.socketId = null;
+    p.disconnectedAt = Date.now();
     // Don't immediately remove the player — page navigations (landing -> /play)
     // disconnect briefly. The cleanup sweep will remove truly stale players.
     //
     // Re-check phase completion: if a disconnected player was the one everyone
-    // was waiting on, the game should advance rather than hang.
-    if (room.phase === 'writing' && room.round) {
-      if (rooms._allWritersSubmitted(room)) rooms._finishWriting(room);
-    }
-    if (room.phase === 'drawing' && room.round) {
-      if (rooms._allDrawingsSubmitted(room)) rooms._finishDrawing(room);
+    // was waiting on, the game should advance rather than hang. For writing
+    // and drawing, wait a little first: phones drop for a few seconds when
+    // you switch apps, and advancing instantly threw away their work.
+    const phaseAtDrop = room.phase;
+    const roundAtDrop = room.currentRound;
+    if ((phaseAtDrop === 'writing' || phaseAtDrop === 'drawing') && room.round) {
+      setTimeout(() => {
+        if (room.phase !== phaseAtDrop || room.currentRound !== roundAtDrop || p.connected) return;
+        if (phaseAtDrop === 'writing' && rooms._allWritersSubmitted(room)) rooms._finishWriting(room);
+        if (phaseAtDrop === 'drawing' && rooms._allDrawingsSubmitted(room)) rooms._finishDrawing(room);
+        broadcastState(room);
+      }, RECONNECT_GRACE_MS);
     }
     if (room.phase === 'voting' && room.round) {
       const m = rooms._currentMatchup(room);

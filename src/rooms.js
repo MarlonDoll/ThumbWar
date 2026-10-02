@@ -182,6 +182,16 @@ class RoomManager {
     return out;
   }
 
+  // Someone (re)connecting while titles are being written who isn't part of
+  // this round yet (they were offline when it started) gets added to it.
+  ensureInRound(room, playerId) {
+    if (room.phase !== PHASES.WRITING || !room.round) return;
+    const p = room.players.find((x) => x.id === playerId);
+    if (!p || p.spectator || room.round.writers.includes(playerId)) return;
+    room.round.writers.push(playerId);
+    room.round.suggestions[playerId] = { personas: pickRandomPersonas(5), formats: pickRandomFormats(6) };
+  }
+
   submitTitle(room, playerId, payload) {
     if (room.phase !== PHASES.WRITING) return { error: 'Not in writing phase' };
     const persona = (payload.persona || '').trim().slice(0, 60);

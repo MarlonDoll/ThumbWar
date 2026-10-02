@@ -81,9 +81,13 @@
       preview.textContent = input.value || 'YOUR THUMBNAIL TEXT';
       preview.style.fontSize = sizeIn.value + 'px';
       preview.style.color = colorIn.value;
-      preview.style.fontFamily = fontIn.value + ', sans-serif';
+      preview.style.fontFamily = `"${fontIn.value}", "Anton", "Arial Black", sans-serif`;
       preview.style.fontWeight = isBold ? '900' : '400';
-      preview.style.webkitTextStroke = isBold ? '2px black' : '1px black';
+      // Same contrasting outline the canvas uses (white on dark text).
+      const hex = colorIn.value.replace('#', '');
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      const outline = (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.45 ? 'white' : 'black';
+      preview.style.webkitTextStroke = `1px ${outline}`;
       boldBtn.classList.toggle('btn-primary', isBold);
     }
     input.addEventListener('input', refreshPreview);
@@ -394,9 +398,13 @@
     loadActiveTask();
     updateDrawingStatus();
 
-    // Robustness: if tasks haven't arrived yet, poll until they do
+    // Robustness: if tasks haven't arrived yet, poll until they do, and
+    // re-sync with the server every few seconds in case the connection
+    // dropped and our private data never arrived.
     if (getTasks().length === 0) {
+      let polls = 0;
       state.drawing._pollInterval = setInterval(() => {
+        if (++polls % 6 === 0) socket.emit('resume', { code, playerId: state.playerId }, () => {});
         if (state.public?.phase !== 'drawing') {
           clearInterval(state.drawing._pollInterval);
           state.drawing._pollInterval = null;

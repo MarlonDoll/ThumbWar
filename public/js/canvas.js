@@ -97,8 +97,17 @@
       return c;
     }
 
+    // Impact isn't installed on iPhones/Android, which then fell back to a
+    // much heavier font; Anton (a web font) is the look-alike fallback.
     _textFont(o) {
-      return `${o.bold === false ? '400' : '900'} ${o.size}px "${o.font || 'Impact'}", "Arial Black", sans-serif`;
+      return `${o.bold ? '900' : '400'} ${o.size}px "${o.font || 'Impact'}", "Anton", "Arial Black", sans-serif`;
+    }
+
+    // Outline that contrasts with the fill, like real thumbnails: white
+    // around dark text, black around light text.
+    _outlineFor(hex) {
+      const [r, g, b] = this._hexToRgb(hex || '#000000');
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.45 ? '#ffffff' : '#000000';
     }
 
     _drawObject(ctx, o) {
@@ -108,8 +117,8 @@
         ctx.font = this._textFont(o);
         ctx.textBaseline = 'top';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = Math.max(2, o.size * 0.08);
-        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(2, o.size * 0.06);
+        ctx.strokeStyle = this._outlineFor(o.color);
         ctx.fillStyle = o.color;
         ctx.strokeText(o.text, o.x, o.y);
         ctx.fillText(o.text, o.x, o.y);
@@ -446,7 +455,14 @@
     }
 
     addText({ text, size, color, font, bold, x, y }) {
-      this._add({ type: 'text', text, size: size || this.textSize, color: color || this.color, font: font || 'Impact', bold: bold !== false, opacity: this.opacity, x, y });
+      this._add({ type: 'text', text, size: size || this.textSize, color: color || this.color, font: font || 'Impact', bold: !!bold, opacity: this.opacity, x, y });
+      this._whenFontsReady();
+    }
+
+    _whenFontsReady() {
+      if (!document.fonts) return;
+      const loads = this.objects.filter((o) => o.type === 'text').map((o) => document.fonts.load(this._textFont(o), o.text).catch(() => {}));
+      Promise.all(loads).then(() => this.render());
     }
 
     // Stamp a sticker in the middle; it stays selected so it can be dragged.
@@ -518,7 +534,8 @@
         editing: true,
         onConfirm: ({ text, size, color, font, bold }) => {
           if (!text) return;
-          Object.assign(o, { text, color, font, bold });
+          Object.assign(o, { text, color, font, bold: !!bold });
+          this._whenFontsReady();
           this._setSize(o, size);
           this._commitChange();
           this.render();
@@ -737,7 +754,7 @@
     }
 
     loadState(state) {
-      return this._loadBase(state && state.base).then(() => this._reset(state ? state.objects : []));
+      return this._loadBase(state && state.base).then(() => { this._reset(state ? state.objects : []); this._whenFontsReady(); });
     }
 
     // Load a flat image (no editable objects), or a blank canvas for null.
