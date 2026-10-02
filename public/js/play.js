@@ -226,7 +226,7 @@
       const rounds = cfg.ROUNDS || 3;
       summary.innerHTML = `
         <h3 class="settings-title">This game</h3>
-        <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 90)} per drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 15)} per vote</p>
+        <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 180)} per drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 15)} per vote</p>
         ${cfg.MATCHUP_SIZE === 3 ? '<p class="muted tiny">⚔️ 3-way matchups (with 6+ players): you\'ll draw 3 thumbnails a round.</p>' : ''}
         ${cfg.SHARE_HALL ? '<p class="muted tiny">📸 The best thumbnail will be featured in the Hall of Thumbs.</p>' : ''}
       `;
@@ -242,7 +242,7 @@
         if (el) el.value = String(val);
       };
       setVal('cfg-write', cfg.WRITE_SECONDS || 45);
-      setVal('cfg-draw', cfg.DRAW_SECONDS || 90);
+      setVal('cfg-draw', cfg.DRAW_SECONDS || 180);
       setVal('cfg-vote', cfg.VOTE_SECONDS || 15);
       setVal('cfg-browse', cfg.BROWSE_SECONDS || 30);
       setVal('cfg-rounds', cfg.ROUNDS || 3);
@@ -319,11 +319,19 @@
         { persona: personaInput.value, title, format: '' },
         (res) => {
           if (res && res.error) showToast(res.error);
-          else showToast('Title submitted');
+          else {
+            state._editingTitle = false;
+            showToast('Title submitted');
+            updateWritingStatus();
+          }
         }
       );
     };
 
+    document.getElementById('writing-edit').onclick = () => {
+      state._editingTitle = true;
+      updateWritingStatus();
+    };
     updateWritingStatus();
   }
 
@@ -390,8 +398,24 @@
     const submittedCount = state.public.writing?.submitted?.length || 0;
     const total = state.public.players.filter((p) => !p.spectator).length;
     const priv = state.private || {};
-    const mine = priv.myTitle ? '✓ Submitted — you can edit and resubmit. ' : '';
-    statusEl.textContent = `${mine}${submittedCount}/${total} players submitted`;
+    statusEl.textContent = `${submittedCount}/${total} players submitted`;
+    const done = document.getElementById('writing-done');
+    const form = document.querySelector('.write-grid');
+    const actions = document.querySelector('.writing-actions .writing-buttons');
+    const submitted = !!priv.myTitle && !state._editingTitle;
+    if (done) {
+      done.hidden = !submitted;
+      if (submitted) {
+        const waiting = Math.max(0, total - submittedCount);
+        document.getElementById('writing-done-title').textContent = `“${priv.myTitle.title}”`;
+        document.getElementById('writing-done-creator').textContent = priv.myTitle.persona || '';
+        document.getElementById('writing-done-wait').textContent = waiting
+          ? `Waiting for ${waiting} more player${waiting === 1 ? '' : 's'}…`
+          : 'Everyone\'s in — drawing starts now!';
+      }
+    }
+    if (form) form.hidden = submitted;
+    if (actions) actions.hidden = submitted;
   }
 
   function creatorInitials(persona) {
@@ -638,7 +662,10 @@
     if (state.drawing.refresh) state.drawing.refresh();
     if (!el) return;
     const done = tasks.filter((t) => t.submitted).length;
-    el.textContent = `${done}/${tasks.length} thumbnails submitted`;
+    el.textContent = tasks.length && done === tasks.length
+      ? `✅ All ${tasks.length} thumbnail${tasks.length === 1 ? '' : 's'} submitted — waiting for the others (you can still tweak and resubmit)`
+      : `${done}/${tasks.length} thumbnails submitted`;
+    el.classList.toggle('all-done', tasks.length > 0 && done === tasks.length);
   }
 
   function buildPalette(canvas) {
@@ -1244,11 +1271,33 @@
     }
   }
 
+  // True once I've handed in everything this phase needs from me, so the
+  // countdown (and its ticks/flashes) would only cause doubt.
+  function iAmDone() {
+    const phase = state.public?.phase;
+    if (phase === 'writing') return !!state.private?.myTitle;
+    if (phase === 'drawing') {
+      const tasks = getTasks();
+      return tasks.length > 0 && tasks.every((t) => t.submitted);
+    }
+    return false;
+  }
+
   function updateTimer() {
     if (!state.public || !state.public.timerEndsAt) {
       timerPill.hidden = true;
       return;
     }
+    if (iAmDone()) {
+      timerPill.hidden = false;
+      timerPill.textContent = '✅ Submitted';
+      timerPill.classList.remove('urgent');
+      timerPill.classList.add('done');
+      lastTickSecond = -1;
+      lastWarnSecond = -1;
+      return;
+    }
+    timerPill.classList.remove('done');
     const skew = state.clockOffset || 0;
     let remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));
     let drawPrefix = '';
@@ -1325,7 +1374,7 @@
         document.removeEventListener('keydown', state.drawing._keyHandler);
         state.drawing._keyHandler = null;
       }
-      if (phase === 'writing') state.suggestionCache = { personas: null, formats: null };
+      if (phase === 'writing') { state.suggestionCache = { personas: null, formats: null }; state._editingTitle = false; }
       if (phase !== 'results') state._resultsCelebrated = false;
       if (phase !== 'browse') state._browseBuilt = false;
       if (phase === 'drawing') {

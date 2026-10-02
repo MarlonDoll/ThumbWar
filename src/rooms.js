@@ -18,7 +18,7 @@ const PHASES = {
 const DEFAULTS = {
   WRITE_SECONDS: 45,
   // Per thumbnail: each drawing gets its own countdown.
-  DRAW_SECONDS: 90,
+  DRAW_SECONDS: 180,
   VOTE_SECONDS: 15,
   BROWSE_SECONDS: 30,
   ROUNDS: 3,

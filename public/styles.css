@@ -2389,3 +2389,21 @@ textarea.input-xl {
   .banner-channel { font-size: 13px; }
   .browse-creator { padding: 0 8px 8px; font-size: 11px; }
 }
+
+/* ================= "You're done" states ================= */
+.pill-timer.done { background: #1eb854; color: #fff; animation: none; }
+.submitted-card {
+  text-align: center;
+  padding: 28px 16px;
+  border: 2px solid #1eb854;
+  border-radius: 16px;
+  background: rgba(30, 184, 84, 0.08);
+  margin: 12px 0 18px;
+}
+.submitted-card[hidden] { display: none; }
+.submitted-check { font-size: 48px; line-height: 1; }
+.submitted-card h2 { margin: 8px 0 6px; }
+.submitted-title { font-size: 20px; font-weight: 800; margin: 6px 0 2px; }
+.submitted-wait { font-weight: 700; margin: 14px 0; }
+.write-grid[hidden], .writing-buttons[hidden] { display: none !important; }
+#drawing-status.all-done { color: #1eb854; font-weight: 700; }

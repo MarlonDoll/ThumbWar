@@ -102,11 +102,9 @@
                 <label class="setting-ctl">
                   <span class="setting-label">🎨 Drawing (each thumbnail)</span>
                   <select id="cfg-draw">
-                    <option value="45">45 sec</option>
-                    <option value="60">1 min</option>
-                    <option value="90" selected>1.5 min</option>
-                    <option value="120">2 min</option>
-                    <option value="180">3 min</option>
+                    <option value="180" selected>3 min</option>
+                    <option value="240">4 min</option>
+                    <option value="300">5 min</option>
                   </select>
                 </label>
                 <label class="setting-ctl">
@@ -205,6 +203,14 @@
             <p class="caveat" style="color:var(--muted);font-size:16px">Tap a format and the blanks become part of your title.</p>
             <div id="format-suggestions" class="format-wrap"></div>
           </div>
+        </div>
+        <div class="submitted-card" id="writing-done" hidden>
+          <div class="submitted-check">✅</div>
+          <h2>Title submitted!</h2>
+          <p class="submitted-title" id="writing-done-title"></p>
+          <p class="muted" id="writing-done-creator"></p>
+          <p class="submitted-wait" id="writing-done-wait"></p>
+          <button class="btn btn-ghost btn-sm" id="writing-edit">✏️ Edit my title</button>
         </div>
         <div class="writing-actions">
           <span id="writing-status" class="muted"></span>
