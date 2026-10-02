@@ -1,7 +1,11 @@
-// Drawing canvas with pen/eraser/fill/shapes/text, colors, opacity,
-// brush/text sizes, and undo/redo.
+// Drawing canvas with pen/eraser/fill/shapes, editable text and stickers,
+// colors, opacity, brush sizes, and undo/redo.
 //
-// Exposes a single constructor: ThumbCanvas(canvasEl, opts).
+// Pixels (pen, eraser, shapes, fill) live on an off-screen "base" layer.
+// Text and stickers are objects drawn on top of it, so they can be tapped,
+// moved, resized, edited or deleted at any time — not just when placed.
+//
+// Exposes a single constructor: ThumbCanvas(canvasEl).
 
 (function (global) {
   const DEFAULT_PALETTE = [
@@ -14,6 +18,9 @@
     // extras
     '#7a4b2a', '#00e5ff', '#a3e635', '#f97316', '#e11d48', '#1e293b'
   ];
+  const STICKER_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  const SHAPES = ['line', 'rect', 'circle', 'arrow'];
+  const SIZE_LIMITS = { text: [12, 400], sticker: [40, 640] };
 
   function createCanvas(w, h) {
     const c = document.createElement('canvas');
@@ -21,176 +28,520 @@
     c.height = h;
     return c;
   }
+  const cloneObjects = (objs) => objs.map((o) => ({ ...o }));
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   class ThumbCanvas {
     constructor(canvas) {
       this.canvas = canvas;
-      this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+      this.ctx = canvas.getContext('2d');
       this.width = canvas.width;
       this.height = canvas.height;
+      this.base = createCanvas(this.width, this.height);
+      this.bctx = this.base.getContext('2d', { willReadFrequently: true });
 
       this.tool = 'pen';
       this.color = '#000000';
       this.size = 6;
       this.textSize = 48;
-      this.textFont = 'Impact';
-      this.textBold = true;
       this.opacity = 1;
+
+      this.objects = [];
+      this.selected = null;
+      this.onSelectionChange = null;
+      this._nextId = 1;
 
       this.undoStack = [];
       this.redoStack = [];
       this.maxUndo = 20;
+      // While a just-added object is still selected, moving/resizing it
+      // updates the same undo step, so one undo removes it entirely.
+      this._amendId = null;
 
-      // Off-screen snapshot used when dragging shapes (pre-shape image).
-      this.baseSnapshot = null;
-
+      this.pointers = new Map();
+      this.gesture = null;
       this.isDrawing = false;
-      this.startX = 0;
-      this.startY = 0;
-      this.lastX = 0;
-      this.lastY = 0;
 
       this._fillBackground('#ffffff');
       this._pushUndo();
-
       this._bind();
+      this.render();
     }
+
+    // ----- rendering -----
 
     _fillBackground(color) {
-      this.ctx.save();
-      this.ctx.fillStyle = color;
-      this.ctx.globalAlpha = 1;
-      this.ctx.fillRect(0, 0, this.width, this.height);
-      this.ctx.restore();
+      const b = this.bctx;
+      b.save();
+      b.globalAlpha = 1;
+      b.globalCompositeOperation = 'source-over';
+      b.fillStyle = color;
+      b.fillRect(0, 0, this.width, this.height);
+      b.restore();
     }
+
+    render() {
+      const ctx = this.ctx;
+      ctx.clearRect(0, 0, this.width, this.height);
+      ctx.drawImage(this.base, 0, 0);
+      for (const o of this.objects) this._drawObject(ctx, o);
+      if (this.selected) this._drawSelection(ctx, this.selected);
+    }
+
+    // Base + objects, without selection handles (what gets submitted).
+    _composite() {
+      const c = createCanvas(this.width, this.height);
+      const x = c.getContext('2d');
+      x.drawImage(this.base, 0, 0);
+      for (const o of this.objects) this._drawObject(x, o);
+      return c;
+    }
+
+    _textFont(o) {
+      return `${o.bold === false ? '400' : '900'} ${o.size}px "${o.font || 'Impact'}", "Arial Black", sans-serif`;
+    }
+
+    _drawObject(ctx, o) {
+      ctx.save();
+      if (o.type === 'text') {
+        ctx.globalAlpha = o.opacity ?? 1;
+        ctx.font = this._textFont(o);
+        ctx.textBaseline = 'top';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(2, o.size * 0.08);
+        ctx.strokeStyle = '#000000';
+        ctx.fillStyle = o.color;
+        ctx.strokeText(o.text, o.x, o.y);
+        ctx.fillText(o.text, o.x, o.y);
+      } else if (o.type === 'sticker') {
+        ctx.font = `${o.size}px ${STICKER_FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(o.emoji, o.x, o.y);
+      }
+      ctx.restore();
+    }
+
+    _bounds(o) {
+      if (o.type === 'text') {
+        this.ctx.save();
+        this.ctx.font = this._textFont(o);
+        const w = this.ctx.measureText(o.text).width;
+        this.ctx.restore();
+        return { x: o.x, y: o.y, w, h: o.size * 1.05 };
+      }
+      return { x: o.x - o.size / 2, y: o.y - o.size / 2, w: o.size, h: o.size };
+    }
+
+    // Canvas pixels per screen pixel, so handles stay finger-sized on phones.
+    _k() {
+      const r = this.canvas.getBoundingClientRect();
+      return r.width ? this.width / r.width : 1;
+    }
+
+    _handles(o) {
+      const b = this._bounds(o);
+      const k = this._k();
+      const pad = 8 * k;
+      return {
+        box: { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 },
+        resize: { x: b.x + b.w + pad, y: b.y + b.h + pad, r: 16 * k },
+        del: { x: b.x + b.w + pad, y: b.y - pad, r: 14 * k }
+      };
+    }
+
+    _drawSelection(ctx, o) {
+      const { box, resize, del } = this._handles(o);
+      const k = this._k();
+      ctx.save();
+      ctx.lineWidth = 2 * k;
+      ctx.setLineDash([8 * k, 6 * k]);
+      ctx.strokeStyle = '#00b3ff';
+      ctx.strokeRect(box.x, box.y, box.w, box.h);
+      ctx.setLineDash([]);
+      // Resize handle (bottom-right)
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#00b3ff';
+      ctx.lineWidth = 3 * k;
+      ctx.beginPath(); ctx.arc(resize.x, resize.y, resize.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#0a5ea8';
+      ctx.lineWidth = 2.5 * k;
+      const a = resize.r * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(resize.x - a, resize.y - a); ctx.lineTo(resize.x + a, resize.y + a);
+      ctx.moveTo(resize.x + a, resize.y + a); ctx.lineTo(resize.x + a, resize.y);
+      ctx.moveTo(resize.x + a, resize.y + a); ctx.lineTo(resize.x, resize.y + a);
+      ctx.stroke();
+      // Delete handle (top-right)
+      ctx.fillStyle = '#ff2d55';
+      ctx.beginPath(); ctx.arc(del.x, del.y, del.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5 * k;
+      const d = del.r * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(del.x - d, del.y - d); ctx.lineTo(del.x + d, del.y + d);
+      ctx.moveTo(del.x + d, del.y - d); ctx.lineTo(del.x - d, del.y + d);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ----- hit testing -----
+
+    _inBox(b, x, y) {
+      return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+    }
+
+    _onHandle(h, x, y, slack = 1.4) {
+      return Math.hypot(x - h.x, y - h.y) <= h.r * slack;
+    }
+
+    _hitObject(x, y) {
+      for (let i = this.objects.length - 1; i >= 0; i--) {
+        if (this._inBox(this._handles(this.objects[i]).box, x, y)) return this.objects[i];
+      }
+      return null;
+    }
+
+    // ----- input -----
 
     _bind() {
       const c = this.canvas;
-      const handlers = {
-        pointerdown: (e) => this._onDown(e),
-        pointermove: (e) => this._onMove(e),
-        pointerup: (e) => this._onUp(e),
-        pointerleave: (e) => {
-          if (this.isDrawing) this._onUp(e);
-        }
-      };
-      for (const [ev, fn] of Object.entries(handlers)) {
-        c.addEventListener(ev, fn);
-      }
-      // A pointerdown anywhere outside the canvas (another tool, a slider,
-      // the page background) commits any text/sticker still being placed.
-      // The Place/Cancel banner is excluded so its buttons keep working.
+      c.addEventListener('pointerdown', (e) => this._onDown(e));
+      c.addEventListener('pointermove', (e) => this._onMove(e));
+      c.addEventListener('pointerup', (e) => this._onUp(e));
+      c.addEventListener('pointercancel', (e) => this._onUp(e));
+      // Tapping outside the canvas finishes editing — except on the toolbar
+      // (so a color swatch can recolor the selected text) and the edit bar.
       document.addEventListener('pointerdown', (e) => {
-        if (!this._placement) return;
-        if (!this.canvas.isConnected) return;
+        if (!this.selected || !this.canvas.isConnected) return;
         if (c.contains(e.target)) return;
-        if (e.target.closest && e.target.closest('#place-banner')) return;
-        this.commitPlacement();
+        if (e.target.closest && e.target.closest('#place-banner, #toolbar, #text-modal')) return;
+        this.deselect();
       }, true);
       document.addEventListener('keydown', (e) => {
         if (!this.canvas.isConnected) return;
-        if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        const mod = e.ctrlKey || e.metaKey;
+        if (e.key === 'z' && mod && !e.shiftKey) {
           e.preventDefault();
           this.undo();
-        } else if (
-          (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) ||
-          (e.key === 'y' && (e.ctrlKey || e.metaKey))
-        ) {
+          return;
+        }
+        if ((e.key === 'z' && mod && e.shiftKey) || (e.key === 'y' && mod)) {
           e.preventDefault();
           this.redo();
+          return;
         }
+        if (!this.selected) return;
+        const t = e.target;
+        const tag = (t.tagName || '').toLowerCase();
+        const typing = tag === 'textarea' || t.isContentEditable ||
+          (tag === 'input' && !['range', 'color', 'checkbox', 'button'].includes(t.type));
+        const modal = document.getElementById('text-modal');
+        if (typing || (modal && !modal.hidden)) return;
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteSelected(); }
+        else if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); this.deselect(); }
       });
     }
 
     _coords(e) {
       const rect = this.canvas.getBoundingClientRect();
-      const sx = this.width / rect.width;
-      const sy = this.height / rect.height;
       return {
-        x: (e.clientX - rect.left) * sx,
-        y: (e.clientY - rect.top) * sy
+        x: (e.clientX - rect.left) * (this.width / rect.width),
+        y: (e.clientY - rect.top) * (this.height / rect.height)
       };
     }
 
     _onDown(e) {
-      if (this._placement) return;
       e.preventDefault();
       // preventDefault keeps focus wherever it was (often a text box or
       // slider), which silently swallows keyboard shortcuts. Drop it.
       const active = document.activeElement;
       if (active && active !== document.body && active.blur) active.blur();
       const { x, y } = this._coords(e);
-      this.startX = x;
-      this.startY = y;
-      this.lastX = x;
-      this.lastY = y;
+      this.pointers.set(e.pointerId, { x, y });
+      try { this.canvas.setPointerCapture(e.pointerId); } catch {}
+
+      // Second finger on a selected object: pinch to resize.
+      if (this.pointers.size === 2 && this.selected) {
+        if (this.isDrawing) this._abortStroke();
+        const [p1, p2] = [...this.pointers.values()];
+        this.gesture = {
+          type: 'pinch', obj: this.selected,
+          startDist: Math.max(1, Math.hypot(p1.x - p2.x, p1.y - p2.y)),
+          startSize: this.selected.size
+        };
+        return;
+      }
+      if (this.pointers.size > 1) return;
+
+      const sel = this.selected;
+      if (sel) {
+        const h = this._handles(sel);
+        if (this._onHandle(h.del, x, y)) { this.deleteSelected(); return; }
+        if (this._onHandle(h.resize, x, y)) {
+          const b = this._bounds(sel);
+          const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+          this.gesture = { type: 'resize', obj: sel, cx, cy, startDist: Math.max(1, Math.hypot(x - cx, y - cy)), startSize: sel.size };
+          return;
+        }
+        if (this._inBox(h.box, x, y)) {
+          this.gesture = { type: 'move', obj: sel, dx: x - sel.x, dy: y - sel.y, changed: false };
+          return;
+        }
+      }
+
+      const hit = this._hitObject(x, y);
+      // Text and fill taps on an object select it straight away. Pen and
+      // shape tools only select on a tap (see _onUp), so you can still draw
+      // across text.
+      if (hit && (this.tool === 'text' || this.tool === 'fill')) {
+        this._select(hit);
+        this.gesture = { type: 'move', obj: hit, dx: x - hit.x, dy: y - hit.y, changed: false };
+        return;
+      }
+
+      if (sel) {
+        this.deselect();
+        // Tapping away with the text tool just finishes editing.
+        if (this.tool === 'text') return;
+      }
 
       if (this.tool === 'fill') {
         this._flood(Math.round(x), Math.round(y));
+        this.render();
         this._pushUndo();
         return;
       }
 
       if (this.tool === 'text') {
-        const opener = window.openTextModal;
-        if (opener) {
-          opener({
+        const open = global.openTextModal;
+        if (open) {
+          open({
             color: this.color,
             size: this.textSize,
-            opacity: this.opacity,
             onConfirm: ({ text, size, color, font, bold }) => {
-              if (!text) return;
-              this._startTextDrag({ text, size, color, font, bold, x, y });
+              if (text) this.addText({ text, size, color, font, bold, x, y });
             }
           });
-        } else {
-          const text = window.prompt('Enter text:');
-          if (text) {
-            this._drawText(x, y, text);
-            this._pushUndo();
-          }
         }
         return;
       }
 
+      // Pen / eraser / shapes draw on the base layer.
       this.isDrawing = true;
-      this.canvas.setPointerCapture?.(e.pointerId);
-
-      if (['line', 'rect', 'circle', 'arrow'].includes(this.tool)) {
-        // Snapshot before drawing shape, so dragging updates cleanly.
-        this.baseSnapshot = this.ctx.getImageData(0, 0, this.width, this.height);
-      } else if (this.tool === 'pen' || this.tool === 'eraser') {
-        // Start a stroke — drop a dot immediately.
-        this._stroke(x, y, x, y);
+      this.stroke = { startX: x, startY: y, lastX: x, lastY: y, moved: 0, hit, snapshot: this.bctx.getImageData(0, 0, this.width, this.height) };
+      if (this.tool === 'pen' || this.tool === 'eraser') {
+        this._strokeLine(x, y, x, y);
+        this.render();
       }
     }
 
     _onMove(e) {
-      if (!this.isDrawing) return;
+      if (!this.pointers.has(e.pointerId)) return;
       const { x, y } = this._coords(e);
-      if (this.tool === 'pen' || this.tool === 'eraser') {
-        this._stroke(this.lastX, this.lastY, x, y);
-        this.lastX = x;
-        this.lastY = y;
-      } else if (this.baseSnapshot) {
-        // Restore snapshot, then draw the new shape preview.
-        this.ctx.putImageData(this.baseSnapshot, 0, 0);
-        this._drawShape(this.startX, this.startY, x, y);
-        this.lastX = x;
-        this.lastY = y;
+      this.pointers.set(e.pointerId, { x, y });
+      const g = this.gesture;
+
+      if (g && g.type === 'pinch' && this.pointers.size >= 2) {
+        const [p1, p2] = [...this.pointers.values()];
+        const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        this._setSize(g.obj, g.startSize * (dist / g.startDist));
+        g.changed = true;
+        this.render();
+        return;
       }
+      if (g && g.type === 'resize') {
+        const dist = Math.hypot(x - g.cx, y - g.cy);
+        this._setSize(g.obj, g.startSize * (dist / g.startDist));
+        g.changed = true;
+        this.render();
+        return;
+      }
+      if (g && g.type === 'move') {
+        g.obj.x = x - g.dx;
+        g.obj.y = y - g.dy;
+        this._keepOnCanvas(g.obj);
+        g.changed = true;
+        this.render();
+        return;
+      }
+
+      if (!this.isDrawing) return;
+      const s = this.stroke;
+      s.moved = Math.max(s.moved, Math.hypot(x - s.startX, y - s.startY));
+      if (this.tool === 'pen' || this.tool === 'eraser') {
+        this._strokeLine(s.lastX, s.lastY, x, y);
+      } else if (SHAPES.includes(this.tool)) {
+        this.bctx.putImageData(s.snapshot, 0, 0);
+        this._drawShape(s.startX, s.startY, x, y);
+      }
+      s.lastX = x;
+      s.lastY = y;
+      this.render();
     }
 
     _onUp(e) {
+      this.pointers.delete(e.pointerId);
+      try { this.canvas.releasePointerCapture(e.pointerId); } catch {}
+      const g = this.gesture;
+      if (g) {
+        // A pinch ends when either finger lifts.
+        this.gesture = null;
+        if (g.changed) this._commitChange();
+        return;
+      }
       if (!this.isDrawing) return;
       this.isDrawing = false;
-      try { this.canvas.releasePointerCapture?.(e.pointerId); } catch {}
-      this.baseSnapshot = null;
+      const s = this.stroke;
+      this.stroke = null;
+      // A tap (not a drag) on a text/sticker selects it instead of drawing.
+      if (s.hit && s.moved < 8 * this._k()) {
+        this.bctx.putImageData(s.snapshot, 0, 0);
+        this._select(s.hit);
+        return;
+      }
       this._pushUndo();
     }
 
-    _stroke(x1, y1, x2, y2) {
-      const ctx = this.ctx;
+    _abortStroke() {
+      if (this.stroke) this.bctx.putImageData(this.stroke.snapshot, 0, 0);
+      this.isDrawing = false;
+      this.stroke = null;
+      this.render();
+    }
+
+    // ----- objects -----
+
+    _setSize(o, size) {
+      const [lo, hi] = SIZE_LIMITS[o.type];
+      const before = this._bounds(o);
+      const cx = before.x + before.w / 2, cy = before.y + before.h / 2;
+      o.size = Math.round(clamp(size, lo, hi));
+      if (o.type === 'text') {
+        // Keep the text centered where it was while it grows or shrinks.
+        const after = this._bounds(o);
+        o.x = cx - after.w / 2;
+        o.y = cy - after.h / 2;
+      }
+      this._keepOnCanvas(o);
+    }
+
+    // Don't let an object get dragged entirely off the canvas.
+    _keepOnCanvas(o) {
+      const b = this._bounds(o);
+      const margin = 24;
+      const dx = Math.min(0, this.width - margin - b.x) + Math.max(0, margin - (b.x + b.w));
+      const dy = Math.min(0, this.height - margin - b.y) + Math.max(0, margin - (b.y + b.h));
+      o.x += dx;
+      o.y += dy;
+    }
+
+    _add(obj) {
+      obj.id = this._nextId++;
+      this.objects.push(obj);
+      this._keepOnCanvas(obj);
+      this._select(obj);
+      this._pushUndo();
+      this._amendId = obj.id;
+    }
+
+    addText({ text, size, color, font, bold, x, y }) {
+      this._add({ type: 'text', text, size: size || this.textSize, color: color || this.color, font: font || 'Impact', bold: bold !== false, opacity: this.opacity, x, y });
+    }
+
+    // Stamp a sticker in the middle; it stays selected so it can be dragged.
+    beginSticker(emoji) {
+      this._add({ type: 'sticker', emoji, size: 160, x: this.width / 2, y: this.height / 2 });
+    }
+
+    _select(o) {
+      if (this.selected === o) return;
+      // Only the object just added keeps amending its own undo step.
+      if (o.id !== this._amendId) this._amendId = null;
+      this.selected = o;
+      this.render();
+      if (this.onSelectionChange) this.onSelectionChange(o);
+    }
+
+    deselect() {
+      if (!this.selected) return;
+      this.selected = null;
+      this._amendId = null;
+      this.render();
+      if (this.onSelectionChange) this.onSelectionChange(null);
+    }
+
+    deleteSelected() {
+      const o = this.selected;
+      if (!o) return;
+      this.objects = this.objects.filter((x) => x !== o);
+      this.selected = null;
+      const fresh = this._amendId === o.id;
+      this._amendId = null;
+      if (fresh) {
+        // Deleting something you just added = it never happened.
+        this.undoStack.pop();
+        this.redoStack = [];
+      } else {
+        this._pushUndo();
+      }
+      this.render();
+      if (this.onSelectionChange) this.onSelectionChange(null);
+    }
+
+    resizeSelectedBy(factor) {
+      if (!this.selected) return;
+      this._setSize(this.selected, this.selected.size * factor);
+      this._commitChange();
+      this.render();
+    }
+
+    // Recolor the selected text (used by the palette).
+    recolorSelected(color) {
+      const o = this.selected;
+      if (!o || o.type !== 'text') return false;
+      o.color = color;
+      this._commitChange();
+      this.render();
+      return true;
+    }
+
+    editSelected() {
+      const o = this.selected;
+      if (!o || o.type !== 'text' || !global.openTextModal) return;
+      global.openTextModal({
+        text: o.text,
+        color: o.color,
+        size: o.size,
+        font: o.font,
+        bold: o.bold,
+        editing: true,
+        onConfirm: ({ text, size, color, font, bold }) => {
+          if (!text) return;
+          Object.assign(o, { text, color, font, bold });
+          this._setSize(o, size);
+          this._commitChange();
+          this.render();
+        }
+      });
+    }
+
+    commitPlacement() { this.deselect(); }
+    cancelPlacement() { this.deselect(); }
+
+    _commitChange() {
+      if (this.selected && this.selected.id === this._amendId && this.undoStack.length > 1) {
+        this.undoStack[this.undoStack.length - 1] = this._snapshot();
+        this.redoStack = [];
+      } else {
+        this._pushUndo();
+      }
+    }
+
+    // ----- base-layer drawing -----
+
+    _strokeLine(x1, y1, x2, y2) {
+      const ctx = this.bctx;
       ctx.save();
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -198,7 +549,6 @@
       if (this.tool === 'eraser') {
         ctx.strokeStyle = '#ffffff';
         ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
       } else {
         ctx.strokeStyle = this.color;
         ctx.globalAlpha = this.opacity;
@@ -211,7 +561,7 @@
     }
 
     _drawShape(x1, y1, x2, y2) {
-      const ctx = this.ctx;
+      const ctx = this.bctx;
       ctx.save();
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -219,7 +569,6 @@
       ctx.strokeStyle = this.color;
       ctx.fillStyle = this.color;
       ctx.globalAlpha = this.opacity;
-
       if (this.tool === 'line') {
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -228,21 +577,16 @@
       } else if (this.tool === 'rect') {
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       } else if (this.tool === 'circle') {
-        const cx = (x1 + x2) / 2;
-        const cy = (y1 + y2) / 2;
-        const rx = Math.abs(x2 - x1) / 2;
-        const ry = Math.abs(y2 - y1) / 2;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, Math.PI * 2);
         ctx.stroke();
       } else if (this.tool === 'arrow') {
-        this._drawArrow(x1, y1, x2, y2);
+        this._drawArrow(ctx, x1, y1, x2, y2);
       }
       ctx.restore();
     }
 
-    _drawArrow(x1, y1, x2, y2) {
-      const ctx = this.ctx;
+    _drawArrow(ctx, x1, y1, x2, y2) {
       const headLen = Math.max(18, this.size * 4);
       const headWidth = Math.max(10, this.size * 2.4);
       const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -257,7 +601,6 @@
       ctx.lineTo(baseX, baseY);
       ctx.stroke();
       ctx.restore();
-      // Filled triangular head, perpendicular width controlled separately
       const perp = angle + Math.PI / 2;
       const wingX = headLen * Math.cos(angle);
       const wingY = headLen * Math.sin(angle);
@@ -271,195 +614,22 @@
       ctx.fill();
     }
 
-    // Start drag-to-place mode for newly added text. The text follows
-    // the pointer until the user clicks/taps to commit it.
-    // Stamp a sticker emoji onto the canvas in draggable move mode.
-    beginSticker(emoji) {
-      const size = 160;
-      const draw = (x, y) => {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.font = `${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(emoji, x, y);
-        ctx.restore();
-      };
-      const bounds = (x, y) => ({ x: x - size / 2, y: y - size / 2, w: size, h: size });
-      this._beginPlacement(draw, bounds, this.width / 2, this.height / 2);
-    }
-
-    // Place text in a draggable "move mode": the text follows your finger
-    // while dragging and only commits when you hit Place (or Enter). You can
-    // reposition as many times as you like before committing.
-    _startTextDrag(opts) {
-      const withTextStyle = (fn) => {
-        const prev = { color: this.color, size: this.textSize, font: this.textFont, bold: this.textBold };
-        this.color = opts.color;
-        this.textSize = opts.size;
-        this.textFont = opts.font || 'Impact';
-        this.textBold = opts.bold !== false;
-        try { return fn(); } finally {
-          this.color = prev.color;
-          this.textSize = prev.size;
-          this.textFont = prev.font;
-          this.textBold = prev.bold;
-        }
-      };
-      const renderAt = (x, y) => withTextStyle(() => this._drawText(x, y, opts.text));
-      const bounds = (x, y) => withTextStyle(() => {
-        this.ctx.save();
-        this.ctx.font = this._textFontString();
-        const w = this.ctx.measureText(opts.text).width;
-        this.ctx.restore();
-        return { x, y, w, h: this.textSize };
-      });
-      this._beginPlacement(renderAt, bounds, opts.x, opts.y);
-    }
-
-    // Finish any in-progress text/sticker placement, keeping it on the canvas.
-    commitPlacement() {
-      if (this._placement) this._placement.commit();
-    }
-
-    // Finish any in-progress placement, removing it from the canvas.
-    cancelPlacement() {
-      if (this._placement) this._placement.cancel();
-    }
-
-    // Shared draggable-placement scaffold used by text and stickers.
-    // Grab inside the item to drag it; click anywhere else on the canvas to
-    // commit it (and, for drawing tools, start drawing right away).
-    _beginPlacement(renderAt, bounds, x0, y0) {
-      // Only one placement at a time — a second one would capture the first
-      // in its snapshot and the two would overwrite each other.
-      this.commitPlacement();
-      const snapshot = this.ctx.getImageData(0, 0, this.width, this.height);
-      let cx = x0;
-      let cy = y0;
-      let dragging = false;
-      let grabDX = 0;
-      let grabDY = 0;
-
-      const draw = (x, y) => {
-        this.ctx.putImageData(snapshot, 0, 0);
-        renderAt(x, y);
-      };
-
-      draw(cx, cy);
-
-      const onDown = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const { x, y } = this._coords(e);
-        const b = bounds(cx, cy);
-        const pad = 24;
-        const inside = x >= b.x - pad && x <= b.x + b.w + pad && y >= b.y - pad && y <= b.y + b.h + pad;
-        if (!inside) {
-          commit();
-          // Text tool would just reopen the modal; for everything else, let
-          // the click carry on as the start of a stroke/shape/fill.
-          if (this.tool !== 'text') this._onDown(e);
-          return;
-        }
-        dragging = true;
-        grabDX = x - cx;
-        grabDY = y - cy;
-        try { this.canvas.setPointerCapture?.(e.pointerId); } catch {}
-      };
-      const onMove = (e) => {
-        if (!dragging) return;
-        const { x, y } = this._coords(e);
-        cx = x - grabDX;
-        cy = y - grabDY;
-        draw(cx, cy);
-      };
-      const onUp = (e) => {
-        dragging = false;
-        try { this.canvas.releasePointerCapture?.(e.pointerId); } catch {}
-      };
-      const onKey = (e) => {
-        if (e.key === 'Escape') cancel();
-        else if (e.key === 'Enter') commit();
-      };
-
-      const commit = () => {
-        if (this._placement !== placement) return;
-        cleanup();
-        this._pushUndo();
-      };
-      const cancel = () => {
-        if (this._placement !== placement) return;
-        this.ctx.putImageData(snapshot, 0, 0);
-        cleanup();
-      };
-      const placement = { commit, cancel };
-
-      const cleanup = () => {
-        this.canvas.removeEventListener('pointerdown', onDown);
-        this.canvas.removeEventListener('pointermove', onMove);
-        this.canvas.removeEventListener('pointerup', onUp);
-        document.removeEventListener('keydown', onKey);
-        this._placement = null;
-        if (window.onTextPlaced) window.onTextPlaced();
-      };
-
-      this._placement = placement;
-      this.canvas.addEventListener('pointerdown', onDown);
-      this.canvas.addEventListener('pointermove', onMove);
-      this.canvas.addEventListener('pointerup', onUp);
-      document.addEventListener('keydown', onKey);
-      if (window.onTextPlacing) window.onTextPlacing(commit, cancel);
-    }
-
-    _drawText(x, y, text) {
-      const ctx = this.ctx;
-      ctx.save();
-      ctx.fillStyle = this.color;
-      ctx.globalAlpha = this.opacity;
-      ctx.font = this._textFontString();
-      ctx.textBaseline = 'top';
-      ctx.lineWidth = Math.max(2, this.textSize * 0.08);
-      ctx.strokeStyle = '#000000';
-      ctx.lineJoin = 'round';
-      ctx.strokeText(text, x, y);
-      ctx.fillText(text, x, y);
-      ctx.restore();
-    }
-
-    _textFontString() {
-      const weight = this.textBold ? '900' : '400';
-      const font = this.textFont || 'Impact';
-      return `${weight} ${this.textSize}px "${font}", "Arial Black", sans-serif`;
-    }
-
     _flood(sx, sy) {
-      const ctx = this.ctx;
+      const ctx = this.bctx;
       const img = ctx.getImageData(0, 0, this.width, this.height);
       const data = img.data;
       const W = this.width;
       const H = this.height;
-
       const idx = (x, y) => (y * W + x) * 4;
       const startIdx = idx(sx, sy);
-      const sr = data[startIdx],
-        sg = data[startIdx + 1],
-        sb = data[startIdx + 2],
-        sa = data[startIdx + 3];
-
+      const sr = data[startIdx], sg = data[startIdx + 1], sb = data[startIdx + 2], sa = data[startIdx + 3];
       const [fr, fg, fb] = this._hexToRgb(this.color);
       const fa = Math.round(this.opacity * 255);
       if (sr === fr && sg === fg && sb === fb && sa === fa) return;
-
       const stack = [[sx, sy]];
       const match = (x, y) => {
         const i = idx(x, y);
-        return (
-          data[i] === sr &&
-          data[i + 1] === sg &&
-          data[i + 2] === sb &&
-          data[i + 3] === sa
-        );
+        return data[i] === sr && data[i + 1] === sg && data[i + 2] === sb && data[i + 3] === sa;
       };
       while (stack.length) {
         const [x, y] = stack.pop();
@@ -473,10 +643,7 @@
         xr--;
         for (let xi = xl; xi <= xr; xi++) {
           const i = idx(xi, y);
-          data[i] = fr;
-          data[i + 1] = fg;
-          data[i + 2] = fb;
-          data[i + 3] = fa;
+          data[i] = fr; data[i + 1] = fg; data[i + 2] = fb; data[i + 3] = fa;
           if (y > 0 && match(xi, y - 1)) stack.push([xi, y - 1]);
           if (y < H - 1 && match(xi, y + 1)) stack.push([xi, y + 1]);
         }
@@ -486,19 +653,19 @@
 
     _hexToRgb(hex) {
       const h = hex.replace('#', '');
-      const v = parseInt(
-        h.length === 3
-          ? h.split('').map((c) => c + c).join('')
-          : h,
-        16
-      );
+      const v = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
       return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+    }
+
+    // ----- undo / redo -----
+
+    _snapshot() {
+      return { img: this.bctx.getImageData(0, 0, this.width, this.height), objects: cloneObjects(this.objects) };
     }
 
     _pushUndo() {
       try {
-        const snap = this.ctx.getImageData(0, 0, this.width, this.height);
-        this.undoStack.push(snap);
+        this.undoStack.push(this._snapshot());
         if (this.undoStack.length > this.maxUndo) this.undoStack.shift();
         this.redoStack = [];
       } catch (e) {
@@ -506,83 +673,98 @@
       }
     }
 
+    _restore(snap) {
+      this.bctx.putImageData(snap.img, 0, 0);
+      this.objects = cloneObjects(snap.objects);
+    }
+
     undo() {
-      // Undo while placing = take the item back off, nothing more.
-      if (this._placement) { this.cancelPlacement(); return; }
-      if (this.undoStack.length <= 1) return;
-      const current = this.undoStack.pop();
-      this.redoStack.push(current);
-      const prev = this.undoStack[this.undoStack.length - 1];
-      this.ctx.putImageData(prev, 0, 0);
+      const hadSelection = !!this.selected;
+      this.selected = null;
+      this._amendId = null;
+      if (this.undoStack.length > 1) {
+        this.redoStack.push(this.undoStack.pop());
+        this._restore(this.undoStack[this.undoStack.length - 1]);
+      }
+      this.render();
+      if (hadSelection && this.onSelectionChange) this.onSelectionChange(null);
     }
 
     redo() {
-      this.commitPlacement();
       if (this.redoStack.length === 0) return;
-      const img = this.redoStack.pop();
-      this.undoStack.push(img);
-      this.ctx.putImageData(img, 0, 0);
+      this.deselect();
+      const snap = this.redoStack.pop();
+      this.undoStack.push(snap);
+      this._restore(snap);
+      this.render();
     }
 
     clear() {
-      this.cancelPlacement();
+      this.deselect();
       this._fillBackground('#ffffff');
+      this.objects = [];
       this._pushUndo();
+      this.render();
     }
 
-    // Load a previous PNG (when switching tasks).
-    loadPng(dataUrl) {
-      // Never let a placement's snapshot leak onto a different task.
-      this.cancelPlacement();
+    // ----- save / load (switching between assigned thumbnails) -----
+
+    // Everything needed to restore this drawing with text still editable.
+    getState() {
+      return { base: this.base.toDataURL('image/png'), objects: cloneObjects(this.objects) };
+    }
+
+    _reset(objects = []) {
+      this.selected = null;
+      this._amendId = null;
+      this.objects = cloneObjects(objects);
+      this.undoStack = [];
+      this.redoStack = [];
+      this._pushUndo();
+      this.render();
+      if (this.onSelectionChange) this.onSelectionChange(null);
+    }
+
+    _loadBase(dataUrl) {
       return new Promise((resolve) => {
-        if (!dataUrl) {
-          this._fillBackground('#ffffff');
-          this.undoStack = [];
-          this.redoStack = [];
-          this._pushUndo();
-          return resolve();
-        }
+        this._fillBackground('#ffffff');
+        if (!dataUrl) return resolve();
         const img = new Image();
-        img.onload = () => {
-          this.ctx.clearRect(0, 0, this.width, this.height);
-          this._fillBackground('#ffffff');
-          this.ctx.drawImage(img, 0, 0, this.width, this.height);
-          this.undoStack = [];
-          this.redoStack = [];
-          this._pushUndo();
-          resolve();
-        };
-        img.onerror = () => {
-          this._fillBackground('#ffffff');
-          this._pushUndo();
-          resolve();
-        };
+        img.onload = () => { this.bctx.drawImage(img, 0, 0, this.width, this.height); resolve(); };
+        img.onerror = () => resolve();
         img.src = dataUrl;
       });
     }
 
+    loadState(state) {
+      return this._loadBase(state && state.base).then(() => this._reset(state ? state.objects : []));
+    }
+
+    // Load a flat image (no editable objects), or a blank canvas for null.
+    loadPng(dataUrl) {
+      return this._loadBase(dataUrl).then(() => this._reset([]));
+    }
+
     toDataURL() {
-      this.commitPlacement();
       // Downscale on export so the server cap (~1.5MB) is never breached even
       // if the canvas is busy. The canvas itself stays at full 1280x720 for
       // drawing precision.
+      const src = this._composite();
       const sizes = [
         [960, 540, 0.75],
         [800, 450, 0.7],
         [640, 360, 0.6]
       ];
       for (const [w, h, q] of sizes) {
-        const out = document.createElement('canvas');
-        out.width = w;
-        out.height = h;
+        const out = createCanvas(w, h);
         const ctx = out.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(this.canvas, 0, 0, w, h);
+        ctx.drawImage(src, 0, 0, w, h);
         const data = out.toDataURL('image/jpeg', q);
         if (data.length <= 1_400_000) return data;
       }
-      return this.canvas.toDataURL('image/jpeg', 0.5);
+      return src.toDataURL('image/jpeg', 0.5);
     }
   }
 

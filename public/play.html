@@ -269,9 +269,14 @@
         <div class="canvas-shell">
           <canvas id="thumb" width="1280" height="720"></canvas>
           <div class="place-banner" id="place-banner" hidden>
-            <span>Drag to move · click away or switch tools to place · </span>
-            <button class="btn btn-primary btn-sm" id="place-confirm">Place</button>
-            <button class="btn btn-ghost btn-sm" id="place-cancel">Cancel</button>
+            <span class="place-hint">Drag to move · drag ◢ or pinch to resize</span>
+            <span class="place-actions">
+              <button class="btn btn-ghost btn-sm" id="obj-smaller" title="Smaller">A−</button>
+              <button class="btn btn-ghost btn-sm" id="obj-bigger" title="Bigger">A+</button>
+              <button class="btn btn-ghost btn-sm" id="obj-edit">Edit</button>
+              <button class="btn btn-ghost btn-sm" id="obj-delete">Delete</button>
+              <button class="btn btn-primary btn-sm" id="place-confirm">Done</button>
+            </span>
           </div>
         </div>
 

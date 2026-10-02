@@ -2255,3 +2255,24 @@ textarea.input-xl {
   }
   .matchup-thumb-meta { font-size: 11px; padding: 6px 7px; }
 }
+
+/* ================= Text/sticker edit bar ================= */
+.place-banner { flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); }
+.place-hint { color: var(--muted); font-size: 13px; }
+.place-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.place-actions .btn[hidden] { display: none; }
+@media (max-width: 720px) {
+  /* On phones the canvas is short, so the bar sits under it instead of on it. */
+  .drawing .place-banner {
+    position: static;
+    transform: none;
+    max-width: none;
+    margin-top: 6px;
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .drawing .place-banner[hidden] { display: none; }
+  .place-actions { width: 100%; }
+  .place-actions .btn { flex: 1 1 0; padding: 10px 4px; }
+  .place-hint { font-size: 12px; width: 100%; text-align: center; }
+}

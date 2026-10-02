@@ -19,7 +19,7 @@
       activeIndex: 0,
       canvas: null,
       // cache of PNGs per assigned writerId (so switching is lossless)
-      cachedPngs: {}
+      cachedPngs: {}, cachedStates: {}
     },
     // Browse phase UI
     browse: { activeCat: 'funniest' },
@@ -116,12 +116,14 @@
       if (cb && payload.text) cb(payload);
     });
 
-    window.openTextModal = ({ color, size, opacity, onConfirm }) => {
-      input.value = '';
-      sizeIn.value = size || 64;
+    window.openTextModal = ({ color, size, onConfirm, text, font, bold, editing }) => {
+      input.value = text || '';
+      sizeIn.value = Math.min(160, size || 64);
       colorIn.value = color || '#ffd400';
-      fontIn.value = 'Impact';
-      isBold = false;
+      fontIn.value = font || 'Impact';
+      isBold = editing ? bold !== false : false;
+      confirm.textContent = editing ? 'Update Text' : 'Add Text';
+      modal.querySelector('h2').textContent = editing ? 'Edit text' : 'Add text to thumbnail';
       pendingConfirm = onConfirm;
       modal.hidden = false;
       refreshPreview();
@@ -436,6 +438,7 @@
       if (tasks[state.drawing.activeIndex]) {
         const wid = tasks[state.drawing.activeIndex].writerId;
         state.drawing.cachedPngs[wid] = canvas.toDataURL();
+        state.drawing.cachedStates[wid] = canvas.getState();
       }
       state.drawing.activeIndex = (state.drawing.activeIndex + delta + tasks.length) % tasks.length;
       state.drawing._loadedWriterId = null;
@@ -480,8 +483,9 @@
       // Reloading on every state update wipes whatever the player is drawing.
       if (state.drawing._loadedWriterId !== t.writerId) {
         state.drawing._loadedWriterId = t.writerId;
-        const cached = state.drawing.cachedPngs[t.writerId];
-        canvas.loadPng(cached || null);
+        const saved = state.drawing.cachedStates[t.writerId];
+        if (saved) canvas.loadState(saved);
+        else canvas.loadPng(null);
       }
       if (btn) {
         btn.disabled = false;
@@ -498,6 +502,7 @@
       btn.textContent = 'Submitting…';
       const png = canvas.toDataURL();
       state.drawing.cachedPngs[t.writerId] = png;
+      state.drawing.cachedStates[t.writerId] = canvas.getState();
       socket.emit('submit-drawing', { writerId: t.writerId, png }, (res) => {
         btn.disabled = false;
         if (res && res.error) {
@@ -544,6 +549,7 @@
         canvas.color = color;
         document.getElementById('custom-color').value = color;
         updateSwatchSelection(color);
+        canvas.recolorSelected(color);
         const sp = document.getElementById('size-preview');
         if (sp) sp.style.background = color;
       };
@@ -593,6 +599,7 @@
     };
     document.getElementById('custom-color').oninput = (e) => {
       canvas.color = e.target.value;
+      canvas.recolorSelected(e.target.value);
       updateSwatchSelection(canvas.color);
       refreshSizePreview();
     };
@@ -607,15 +614,19 @@
       btn.onclick = () => canvas.beginSticker(btn.dataset.sticker);
     });
 
-    // Place / cancel banner for text + sticker placement.
+    // Edit bar shown while a text or sticker is selected. Tap any text or
+    // sticker on the canvas (with any tool) to bring it back.
     const banner = document.getElementById('place-banner');
-    window.onTextPlacing = (commit, cancel) => {
+    canvas.onSelectionChange = (obj) => {
       if (!banner) return;
-      banner.hidden = false;
-      document.getElementById('place-confirm').onclick = commit;
-      document.getElementById('place-cancel').onclick = cancel;
+      banner.hidden = !obj;
+      if (obj) document.getElementById('obj-edit').hidden = obj.type !== 'text';
     };
-    window.onTextPlaced = () => { if (banner) banner.hidden = true; };
+    document.getElementById('obj-smaller').onclick = () => canvas.resizeSelectedBy(1 / 1.2);
+    document.getElementById('obj-bigger').onclick = () => canvas.resizeSelectedBy(1.2);
+    document.getElementById('obj-edit').onclick = () => canvas.editSelected();
+    document.getElementById('obj-delete').onclick = () => canvas.deleteSelected();
+    document.getElementById('place-confirm').onclick = () => canvas.deselect();
 
     // Keyboard shortcuts for tools (ignored while typing in an input).
     const shortcuts = { p: 'pen', e: 'eraser', f: 'fill', l: 'line', r: 'rect', c: 'circle', a: 'arrow', t: 'text' };
@@ -1192,7 +1203,7 @@
       if (phase === 'drawing') {
         if (state.drawing._pollInterval) clearInterval(state.drawing._pollInterval);
         if (state.drawing._autoSubmitInterval) clearInterval(state.drawing._autoSubmitInterval);
-        state.drawing = { activeIndex: 0, canvas: null, cachedPngs: {} };
+        state.drawing = { activeIndex: 0, canvas: null, cachedPngs: {}, cachedStates: {} };
       }
       if (phase === 'voting') { state._votingSig = null; state._myVoteCast = false; }
     }
