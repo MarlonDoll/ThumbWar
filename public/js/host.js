@@ -25,7 +25,9 @@
     soundBtn.classList.toggle('needs-tap', !ThumbFx.isUnlocked());
   }
   soundBtn.onclick = () => {
-    if (!ThumbFx.isUnlocked()) { ThumbFx.unlock(); ThumbFx.setMuted(false); }
+    // The page-wide gesture listener unlocks audio on pointerdown, before this
+    // click runs, so decide from what the button was showing, not the context.
+    if (soundBtn.classList.contains('needs-tap')) { ThumbFx.unlock(); ThumbFx.setMuted(false); }
     else ThumbFx.setMuted(!ThumbFx.isMuted());
     setTimeout(refreshSoundBtn, 100);
   };
@@ -107,6 +109,7 @@
     for (const p of active) {
       const mine = submittedByDrawer[p.id] || [];
       const assignedCount = countAssigned(p.id);
+      if (!assignedCount) continue;
       const el = document.createElement('div');
       el.className = 'submit-row';
       el.innerHTML = `
@@ -119,19 +122,13 @@
   }
 
   function countAssigned(playerId) {
-    // Not in public state; infer from submittedByDrawer structure, but the raw
-    // count isn't visible. Fall back to players.length - 1 as a reasonable hint.
-    // (Server enforces the real count.)
-    const n = state.public.players.filter((p) => !p.spectator).length;
-    if (n <= 1) return 1;
-    if (n === 2) return 1;
-    if (n === 3) return 2;
-    return n >= 6 ? 3 : 2;
+    return state.public.drawing?.assignedByDrawer?.[playerId] || 0;
   }
+
 
   function nameOf(id) {
     const p = state.public.players.find((x) => x.id === id);
-    return p ? p.name : 'Unknown';
+    return p ? p.name : (state.public.names?.[id] || 'Unknown');
   }
 
   function renderVoting() {
@@ -276,7 +273,7 @@
     }
     const nameOf = (id) => {
       const p = state.public.players.find((x) => x.id === id);
-      return p ? p.name : 'Unknown';
+      return p ? p.name : (state.public.names?.[id] || 'Unknown');
     };
     document.getElementById('host-champion').innerHTML = `
       <div class="champ-trophy">🏆</div>

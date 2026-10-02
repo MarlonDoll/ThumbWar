@@ -29,6 +29,17 @@ app.get('/host', (_req, res) => {
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/random-title', (_req, res) => res.json(generateRandomTitle()));
 app.get('/api/hall', (_req, res) => res.json(hall.list()));
+// Drawings for a room, by id. Ids are random and change per drawing, so the
+// browser can cache them; room codes are already the access control.
+app.get('/img/:code/:id', (req, res) => {
+  const room = rooms.get(req.params.code);
+  const data = room && rooms.getImage(room, req.params.id);
+  const m = data && /^data:(image\/[a-z]+);base64,(.+)$/.exec(data);
+  if (!m) return res.status(404).end();
+  res.set('Content-Type', m[1]);
+  res.set('Cache-Control', 'private, max-age=86400');
+  res.send(Buffer.from(m[2], 'base64'));
+});
 app.use('/hall-images', express.static(hall.HALL_DIR, { maxAge: '7d' }));
 
 const rooms = new RoomManager(io);

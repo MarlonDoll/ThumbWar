@@ -73,7 +73,13 @@ class RoomManager {
       allMatchupResults: [],
       browse: null,
       scores: {},
-      awardResults: null
+      awardResults: null,
+      // Drawings are served over HTTP (/img/CODE/ID) instead of being embedded
+      // in every state broadcast, which made each update several megabytes.
+      images: new Map(),
+      // Names of everyone who has been in the room, so scores and galleries
+      // still show a name after someone leaves.
+      names: { [hostId]: hostName || 'Host' }
     };
     this.rooms.set(code, room);
     return { room, hostId };
@@ -97,6 +103,7 @@ class RoomManager {
       return { error: 'That name is taken in this room' };
     }
     const id = uid('p');
+    room.names[id] = trimmed;
     room.players.push({
       id,
       name: trimmed,
@@ -111,7 +118,7 @@ class RoomManager {
     const p = room.players.find((x) => x.id === playerId);
     if (!p) return;
     const trimmed = (name || '').trim().slice(0, 20);
-    if (trimmed) p.name = trimmed;
+    if (trimmed) { p.name = trimmed; room.names[playerId] = trimmed; }
   }
 
   setSpectator(room, playerId, spectator) {
@@ -240,13 +247,11 @@ class RoomManager {
     );
     if (existing) {
       existing.png = png;
+      room.images.set(existing.id, png);
     } else {
-      room.round.drawings[writerId].push({
-        id: uid('d'),
-        writerId,
-        artistId: playerId,
-        png
-      });
+      const drawing = { id: uid('d'), writerId, artistId: playerId, png };
+      room.round.drawings[writerId].push(drawing);
+      room.images.set(drawing.id, png);
     }
     if (this._allDrawingsSubmitted(room)) {
       this._finishDrawing(room);
@@ -474,6 +479,11 @@ class RoomManager {
         title: r.title,
         thumbnail: winningThumb,
         allThumbnails: r.thumbnails,
+        // Only matchup winners compete for Best Thumbnail; showing every
+        // thumbnail made the browse page hundreds of cards long.
+        browseThumbnails: r.winners.length
+          ? r.thumbnails.filter((t) => r.winners.includes(t.id))
+          : r.thumbnails.slice(0, 1),
         matchupVotes: r.votes
       };
     });
@@ -501,7 +511,7 @@ class RoomManager {
       let foundThumb = null;
       let foundConcept = null;
       for (const c of room.browse.concepts) {
-        const t = (c.allThumbnails || []).find((x) => x.id === targetId);
+        const t = (c.browseThumbnails || c.allThumbnails || []).find((x) => x.id === targetId);
         if (t) { foundThumb = t; foundConcept = c; break; }
       }
       if (!foundThumb) return { error: 'Unknown thumbnail' };
@@ -680,6 +690,7 @@ class RoomManager {
   // Optional: host can manually advance from the results screen back to lobby.
   restart(room) {
     room.phase = PHASES.LOBBY;
+    room.images = new Map();
     room.round = null;
     room.currentRound = 0;
     room.browse = null;
@@ -723,6 +734,14 @@ class RoomManager {
 
   // ----- serialization -----
 
+  getImage(room, id) {
+    return room.images.get(id) || null;
+  }
+
+  _imgUrl(room, t) {
+    return `/img/${room.code}/${t.id}`;
+  }
+
   publicState(room) {
     const base = {
       code: room.code,
@@ -738,6 +757,7 @@ class RoomManager {
       timerEndsAt: room.timerEndsAt,
       serverNow: Date.now(),
       hasDisplay: room.hostDisplays.size > 0,
+      names: room.names,
       config: room.config,
       currentRound: room.currentRound || 0,
       totalRounds: room.config.ROUNDS || 1
@@ -758,7 +778,12 @@ class RoomManager {
           }
         }
       }
+      const assignedByDrawer = {};
+      for (const [drawerId, writerIds] of Object.entries(room.round.drawTasks || {})) {
+        assignedByDrawer[drawerId] = writerIds.length;
+      }
       base.drawing = {
+        assignedByDrawer,
         totalTasks: Object.values(room.round.drawTasks || {}).reduce(
           (s, arr) => s + arr.length,
           0
@@ -781,7 +806,7 @@ class RoomManager {
               // Who drew what stays secret until the results are revealed.
               thumbnails: m.thumbnails.map((t) => ({
                 id: t.id,
-                png: t.png,
+                png: this._imgUrl(room, t),
                 ...(m.results ? { artistId: t.artistId } : {})
               })),
               votedBy: [...m.votedBy],
@@ -798,11 +823,11 @@ class RoomManager {
           writerId: c.writerId,
           artistId: c.artistId,
           title: c.title,
-          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null,
-          allThumbnails: (c.allThumbnails || []).map((t) => ({
+          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: this._imgUrl(room, c.thumbnail) } : null,
+          allThumbnails: (c.browseThumbnails || c.allThumbnails || []).map((t) => ({
             id: t.id,
             artistId: t.artistId,
-            png: t.png
+            png: this._imgUrl(room, t)
           }))
         })),
         eligibleCount: this._connectedActive(room).length,
@@ -823,12 +848,12 @@ class RoomManager {
           writerId: c.writerId,
           artistId: c.artistId,
           title: c.title,
-          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: c.thumbnail.png } : null,
+          thumbnail: c.thumbnail ? { id: c.thumbnail.id, png: this._imgUrl(room, c.thumbnail) } : null,
           matchupVotes: c.matchupVotes || {},
           allThumbnails: c.allThumbnails.map((t) => ({
             id: t.id,
             artistId: t.artistId,
-            png: t.png
+            png: this._imgUrl(room, t)
           }))
         })),
         champion: room.awardResults.champion

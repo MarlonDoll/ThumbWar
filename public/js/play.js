@@ -648,7 +648,7 @@
       return;
     }
     const m = voting.matchup;
-    const nameOf = (id) => state.public.players.find((p) => p.id === id)?.name || 'Unknown';
+    const nameOf = (id) => state.public.players.find((p) => p.id === id)?.name || state.public.names?.[id] || 'Unknown';
     document.getElementById('vote-title-row').textContent =
       `Matchup ${voting.index + 1} of ${voting.total}`;
     document.getElementById('vote-progress').textContent = '';
@@ -780,7 +780,7 @@
     if (!sb) return;
     const nameOf = (id) => {
       const p = state.public.players.find((x) => x.id === id);
-      return p ? p.name : 'Unknown';
+      return p ? p.name : (state.public.names?.[id] || 'Unknown');
     };
     const titleEl = document.getElementById('scoreboard-title');
     const subEl = document.getElementById('scoreboard-sub');
@@ -832,12 +832,10 @@
   function renderBrowse() {
     renderTemplate('tpl-browse');
     const concepts = (state.public.browse && state.public.browse.concepts) || [];
-    const votedBy = state.public.browse.votedBy || {};
 
-    // Best Thumbnail grid — every individual thumbnail is votable
+    // Best Thumbnail grid — each matchup's winning thumbnail(s)
     const thumbGrid = document.getElementById('browse-thumb-grid');
     thumbGrid.innerHTML = '';
-    const thumbVoted = (votedBy.bestThumb || []).includes(state.playerId);
     const allThumbs = [];
     concepts.forEach((c) => {
       const thumbs = c.allThumbnails || (c.thumbnail ? [c.thumbnail] : []);
@@ -850,7 +848,7 @@
       card.dataset.voteCat = 'bestThumb';
       card.dataset.voteId = t.id;
       card.innerHTML = `
-        ${t.png ? `<img src="${t.png}" alt="" />` : '<div class="empty-thumb">no thumbnail</div>'}
+        ${t.png ? `<img src="${t.png}" alt="" loading="lazy" />` : '<div class="empty-thumb">no thumbnail</div>'}
         <div class="browse-title">${escapeHtml(c.title.title)}</div>
         ${isMyArt ? '<div class="browse-yours">Your art</div>' : ''}
       `;
@@ -861,7 +859,6 @@
             const titleDone = (state.public.browse?.votedBy?.bestTitle || []).includes(state.playerId);
             if (titleDone) return showToast('Voted for Best Thumbnail!');
             showToast('Thumbnail vote in! Now pick the best title ↓');
-            // The page re-renders on every broadcast, so look the section up fresh.
             setTimeout(() => {
               document.getElementById('browse-title-section')
                 ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -871,14 +868,10 @@
       }
       thumbGrid.appendChild(card);
     });
-    document.getElementById('browse-thumb-status').textContent = thumbVoted
-      ? '✓ Voted. Tap a different one to change.'
-      : '';
 
     // Best Title grid
     const titleGrid = document.getElementById('browse-title-grid');
     titleGrid.innerHTML = '';
-    const titleVoted = (votedBy.bestTitle || []).includes(state.playerId);
     concepts.forEach((c) => {
       const isMyTitle = c.writerId === state.playerId;
       const card = document.createElement('div');
@@ -899,6 +892,20 @@
       }
       titleGrid.appendChild(card);
     });
+    updateBrowseStatus();
+  }
+
+  // Status lines, step tracker and "your vote" marks — safe to run on every
+  // broadcast because it never replaces the cards.
+  function updateBrowseStatus() {
+    if (!document.getElementById('browse-thumb-grid')) return;
+    const concepts = state.public.browse?.concepts || [];
+    const votedBy = state.public.browse?.votedBy || {};
+    const thumbVoted = (votedBy.bestThumb || []).includes(state.playerId);
+    const titleVoted = (votedBy.bestTitle || []).includes(state.playerId);
+    document.getElementById('browse-thumb-status').textContent = thumbVoted
+      ? '✓ Voted. Tap a different one to change.'
+      : '';
     document.getElementById('browse-title-status').textContent = titleVoted
       ? '✓ Voted. Tap a different one to change.'
       : '';
@@ -947,7 +954,7 @@
     const players = state.public.players;
     const nameOf = (id) => {
       const p = players.find((x) => x.id === id);
-      return p ? p.name : 'Unknown';
+      return p ? p.name : (state.public.names?.[id] || 'Unknown');
     };
 
     // Champion
@@ -1181,6 +1188,7 @@
       }
       if (phase === 'writing') state.suggestionCache = { personas: null, formats: null };
       if (phase !== 'results') state._resultsCelebrated = false;
+      if (phase !== 'browse') state._browseBuilt = false;
       if (phase === 'drawing') {
         if (state.drawing._pollInterval) clearInterval(state.drawing._pollInterval);
         if (state.drawing._autoSubmitInterval) clearInterval(state.drawing._autoSubmitInterval);
@@ -1221,7 +1229,12 @@
       else updateDrawingStatus();
     }
     else if (phase === 'scoreboard') renderScoreboard();
-    else if (phase === 'browse') renderBrowse();
+    else if (phase === 'browse') {
+      // Build the page once; later broadcasts (every vote) only update it, so
+      // cards don't get replaced under someone's finger mid-tap.
+      if (!state._browseBuilt) { state._browseBuilt = true; renderBrowse(); }
+      else updateBrowseStatus();
+    }
     else if (phase === 'results') renderResults();
   }
 

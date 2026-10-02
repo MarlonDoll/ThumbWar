@@ -2227,3 +2227,31 @@ textarea.input-xl {
 @media (max-width: 720px) {
   .display-link-input { width: 84px; }
 }
+
+/* ================= Big games on phones ================= */
+/* Two-up cards so a 12-player browse page or results gallery isn't a
+   20,000px scroll. */
+@media (max-width: 720px) {
+  .browse-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .browse-card .browse-title {
+    font-size: 12px;
+    padding: 8px 8px 6px;
+    line-height: 1.25;
+  }
+  .browse-card-title { padding: 10px; min-height: 64px; }
+  .browse-card-title .browse-title { font-size: 13px; }
+  .browse-yours { padding: 2px 8px 8px; font-size: 10px; }
+  .browse-picked-tag { font-size: 10px; padding: 2px 7px; top: 6px; right: 6px; }
+  .browse-section { padding: 12px; }
+
+  .matchup-row { padding: 10px; }
+  .matchup-row-title { font-size: 14px; }
+  .matchup-row-thumbs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .matchup-thumb-meta { font-size: 11px; padding: 6px 7px; }
+}
