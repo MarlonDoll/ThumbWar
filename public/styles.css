@@ -1681,7 +1681,7 @@ textarea.input-xl {
   color: var(--muted);
   margin-bottom: 12px;
 }
-.shrikhand { font-family: 'Shrikhand', cursive; }
+.shrikhand { font-family: 'Shrikhand', 'Archivo Black', Impact, sans-serif; }
 .caveat { font-family: 'Caveat', cursive; }
 
 .code-boxes { display: flex; gap: 8px; justify-content: center; }
@@ -1746,7 +1746,7 @@ textarea.input-xl {
   min-width: 0;
 }
 .landing-cards .card h2 {
-  font-family: 'Shrikhand', cursive;
+  font-family: 'Shrikhand', 'Archivo Black', Impact, sans-serif;
   font-size: 24px;
 }
 .landing-cards .card .card-sub {
@@ -2022,9 +2022,179 @@ textarea.input-xl {
   .host-thumb-row { flex-direction: column; }
 }
 
-/* The brush-size dot grows up to 32px; negative margins keep it from
-   changing the toolbar height (which used to shift the canvas mid-draw). */
+/* The brush-size dot grows up to 32px; taking it out of the layout keeps it
+   from changing the toolbar height (which used to shift the canvas mid-draw). */
+.ctl { position: relative; }
 .ctl .size-preview {
-  margin-top: -16px;
-  margin-bottom: -16px;
+  position: absolute;
+  left: 30px;
+  top: 7px;
+  transform: translateY(-50%);
+  margin: 0;
+}
+
+/* ================= Laptop/desktop drawing layout ================= */
+/* Tools in a left column and the canvas sized to the viewport height, so the
+   whole canvas fits on a 1366x768 laptop without scrolling. */
+@media (min-width: 1000px) {
+  .drawing.panel {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-areas:
+      "banner banner"
+      "tools canvas"
+      "tools card"
+      "footer footer";
+    column-gap: 16px;
+    padding: 20px;
+  }
+  .drawing .step-pill { display: none; }
+  .drawing .drawing-banner { grid-area: banner; margin-bottom: 12px; }
+  .drawing .toolbar {
+    grid-area: tools;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    align-self: start;
+    position: sticky;
+    top: 12px;
+    gap: 14px;
+    margin: 0;
+  }
+  .drawing .tool-group { flex-wrap: wrap; }
+  .drawing .tool-group.stickers .tool-group-label { flex: 1 1 100%; }
+  .drawing .ctl { flex: 1 1 100%; }
+  .drawing .ctl input[type="range"] { width: 100%; }
+  .drawing .palette { max-width: none; }
+  .drawing .tool-group .btn { flex: 1 1 0; }
+  .drawing .canvas-shell {
+    grid-area: canvas;
+    width: min(100%, calc((100vh - 290px) * 16 / 9));
+    min-width: 480px;
+    justify-self: center;
+  }
+  .drawing .yt-card {
+    grid-area: card;
+    width: min(100%, calc((100vh - 290px) * 16 / 9));
+    min-width: 480px;
+    justify-self: center;
+  }
+  .drawing .drawing-footer { grid-area: footer; }
+}
+
+/* ================= TV display polish ================= */
+.voting-phase { max-width: 1800px; }
+.host-thumb-row .host-thumb { max-width: 880px; }
+.host-phase .scoreboard { margin-left: auto; margin-right: auto; width: 100%; }
+.scoreboard .name { text-align: left; padding-left: 6px; }
+.sb-kicker {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+.page-host .sb-kicker { font-size: 18px; }
+.sb-round-winner {
+  font-size: 20px;
+  margin: 4px 0 18px;
+}
+.page-host .sb-round-winner { font-size: 30px; }
+.sb-round-winner .delta { margin-left: 6px; }
+
+/* Corner countdown ring (voting, browse, scoreboard) */
+.timer-ring {
+  --ring: var(--accent);
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--ring) calc(var(--p, 1) * 360deg), rgba(255, 255, 255, 0.08) 0);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+}
+.timer-ring::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: #0a0a0a;
+}
+.timer-ring span {
+  position: relative;
+  font-size: 38px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.timer-ring.urgent { --ring: var(--yt-red); animation: pulse 0.8s ease-in-out infinite; }
+.timer-ring[hidden] { display: none; }
+
+.sound-toggle.needs-tap {
+  border-color: var(--yt-red);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+/* ================= Juice: entrances, score rows, confetti ================= */
+.host-thumb-row.enter > .host-thumb:first-child { animation: slideInLeft 0.5s cubic-bezier(.2,.9,.3,1.2) both; }
+.host-thumb-row.enter > .host-thumb:last-child { animation: slideInRight 0.5s cubic-bezier(.2,.9,.3,1.2) both; }
+.host-thumb-row.enter > .host-thumb:not(:first-child):not(:last-child) { animation: dropIn 0.5s 0.1s cubic-bezier(.2,.9,.3,1.2) both; }
+.host-thumb-row.enter > .host-vs-badge,
+.vs-arena.enter > .vs-badge { animation: vsSlam 0.45s 0.3s cubic-bezier(.2,.9,.3,1.4) both; }
+.vs-arena.enter > .vs-card { animation: dropIn 0.4s cubic-bezier(.2,.9,.3,1.2) both; }
+.vs-arena.enter > .vs-card:last-child { animation-delay: 0.12s; }
+
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-120px) rotate(-3deg); } to { opacity: 1; transform: none; } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(120px) rotate(3deg); } to { opacity: 1; transform: none; } }
+@keyframes dropIn { from { opacity: 0; transform: translateY(-40px); } to { opacity: 1; transform: none; } }
+@keyframes vsSlam { from { opacity: 0; transform: scale(3); } to { opacity: 1; transform: scale(1); } }
+
+.scoreboard li.sb-enter { animation: rowIn 0.4s calc(var(--i, 0) * 90ms) ease-out both; }
+@keyframes rowIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 400;
+}
+.confetti-layer i {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  animation-name: confettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes confettiFall {
+  to { transform: translate(var(--drift, 0), 110vh) rotate(var(--spin, 360deg)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .host-thumb-row.enter > *, .vs-arena.enter > *, .scoreboard li.sb-enter,
+  .timer-ring.urgent, .sound-toggle.needs-tap { animation: none !important; }
+}
+
+/* ================= Lobby + landing polish ================= */
+.settings-summary-line { margin: 6px 0 0; font-weight: 600; line-height: 1.5; }
+.featured-card { position: relative; }
+.featured-card-new {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--yt-red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
 }

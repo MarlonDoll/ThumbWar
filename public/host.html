@@ -19,6 +19,7 @@
         <span class="brand-name">Thumb<span class="brand-accent">War</span></span>
       </div>
       <div class="host-topbar-right">
+        <button type="button" class="btn btn-ghost btn-sm sound-toggle" id="sound-toggle">🔇 Tap to enable sound</button>
         <span id="room-code-pill" class="pill pill-xl">—</span>
         <span id="timer-pill" class="pill pill-xl pill-timer" hidden>--</span>
       </div>
@@ -60,16 +61,17 @@
         <h1 id="host-vote-title"></h1>
         <p class="subtitle" id="host-vote-sub"></p>
         <div class="host-thumb-row" id="host-thumb-row"></div>
-        <div class="big-timer" id="big-timer">--:--</div>
+        <div class="timer-ring" id="timer-ring"><span id="timer-ring-text">--</span></div>
       </section>
     </template>
 
     <template id="host-tpl-scoreboard">
       <section class="host-phase">
-        <p class="muted small" style="text-transform:uppercase;letter-spacing:0.12em;font-weight:700">ROUND WINNER</p>
+        <p class="sb-kicker" id="host-sb-kicker">Round complete</p>
         <h1 id="host-sb-title" class="shrikhand">Scores</h1>
+        <p class="sb-round-winner" id="host-sb-winner"></p>
         <ol id="host-sb-list" class="scoreboard big"></ol>
-        <div class="big-timer" id="big-timer">--:--</div>
+        <div class="timer-ring" id="timer-ring"><span id="timer-ring-text">--</span></div>
       </section>
     </template>
 
@@ -79,7 +81,7 @@
         <p class="subtitle">On your phone: vote for the <strong>best thumbnail</strong> and the <strong>best title</strong>.</p>
         <div class="host-browse-progress" id="host-browse-progress"></div>
         <div class="browse-grid host" id="host-browse-grid"></div>
-        <div class="big-timer" id="big-timer">--:--</div>
+        <div class="timer-ring" id="timer-ring"><span id="timer-ring-text">--</span></div>
       </section>
     </template>
 
@@ -97,6 +99,7 @@
     </template>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/fx.js"></script>
     <script src="/js/host.js"></script>
   </body>
 </html>

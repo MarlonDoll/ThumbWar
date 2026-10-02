@@ -141,6 +141,15 @@
               </div>
             </div>
 
+            <div class="settings-card" id="hall-settings">
+              <label class="spectator-toggle">
+                <input type="checkbox" id="cfg-hall" /> Feature our best thumbnail in the Hall of Thumbs
+              </label>
+              <p class="muted tiny">Shows the winning drawing, its title and players' names on the public homepage.</p>
+            </div>
+
+            <div class="settings-card settings-summary" id="settings-summary" hidden></div>
+
             <div class="settings-card settings-card-spectator">
               <label class="spectator-toggle">
                 <input type="checkbox" id="spectator" /> Spectator mode <span class="muted small">(watch only)</span>
@@ -299,8 +308,9 @@
 
     <template id="tpl-scoreboard">
       <section class="scoreboard-phase panel">
-        <p class="muted small" style="text-transform:uppercase;letter-spacing:0.12em;font-weight:700" id="scoreboard-round-label">ROUND WINNER</p>
+        <p class="sb-kicker" id="scoreboard-round-label">Round complete</p>
         <h1 id="scoreboard-title" class="shrikhand">Scores</h1>
+        <p class="sb-round-winner" id="scoreboard-winner"></p>
         <p class="muted" id="scoreboard-sub"></p>
         <ol id="mid-scoreboard" class="scoreboard"></ol>
         <p class="muted small" id="scoreboard-next"></p>
@@ -356,6 +366,7 @@
     </template>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/fx.js"></script>
     <script src="/js/canvas.js"></script>
     <script src="/js/play.js"></script>
   </body>

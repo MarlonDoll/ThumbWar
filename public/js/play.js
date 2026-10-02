@@ -129,6 +129,11 @@
     };
   })();
 
+  // Sound effects play on the TV when one is connected; otherwise on phones.
+  function sfx(name) {
+    if (!state.public?.hasDisplay) ThumbFx.play(name);
+  }
+
   function showToast(msg) {
     toast.textContent = msg;
     toast.hidden = false;
@@ -186,9 +191,25 @@
     specBox.checked = !!(m && m.spectator);
     specBox.onchange = () => socket.emit('set-spectator', { spectator: specBox.checked });
 
-    // Timer settings (host only)
+    // Timer settings (host only); everyone else gets a read-only summary.
     const timerSettings = document.getElementById('timer-settings');
+    const hallSettings = document.getElementById('hall-settings');
+    const summary = document.getElementById('settings-summary');
+    {
+      const cfg = state.public.config || {};
+      const fmt = (sec) => (sec % 60 === 0 ? `${sec / 60} min` : sec > 60 ? `${(sec / 60).toFixed(1)} min` : `${sec}s`);
+      const rounds = cfg.ROUNDS || 3;
+      summary.innerHTML = `
+        <h3 class="settings-title">This game</h3>
+        <p class="settings-summary-line">${rounds} round${rounds === 1 ? '' : 's'} · ✍️ ${fmt(cfg.WRITE_SECONDS || 45)} writing · 🎨 ${fmt(cfg.DRAW_SECONDS || 180)} drawing · 🗳️ ${fmt(cfg.VOTE_SECONDS || 25)} per vote</p>
+        ${cfg.SHARE_HALL ? '<p class="muted tiny">📸 The best thumbnail will be featured in the Hall of Thumbs.</p>' : ''}
+      `;
+    }
     if (isHost()) {
+      summary.hidden = true;
+      const hallBox = document.getElementById('cfg-hall');
+      hallBox.checked = !!state.public.config?.SHARE_HALL;
+      hallBox.onchange = () => socket.emit('set-timers', { hall: hallBox.checked });
       const cfg = state.public.config || {};
       const setVal = (id, val) => {
         const el = document.getElementById(id);
@@ -216,6 +237,8 @@
       };
     } else {
       timerSettings.hidden = true;
+      hallSettings.hidden = true;
+      summary.hidden = false;
     }
 
     const startBtn = document.getElementById('start-btn');
@@ -633,6 +656,13 @@
     const arena = document.getElementById('thumb-choices');
     arena.innerHTML = '';
     arena.classList.toggle('vs-3', m.thumbnails.length >= 3);
+    if (!m.results) {
+      arena.classList.add('enter');
+      if (m.thumbnails.length > 1) sfx('vs');
+    } else {
+      const total = Object.values(m.results.votes || {}).reduce((a, b) => a + b, 0);
+      sfx(m.results.winners.length === 1 && total > 0 ? 'win' : 'tie');
+    }
 
     const alreadyVoted = (m.votedBy || []).includes(state.playerId);
     const hasResults = !!(m.results);
@@ -756,9 +786,17 @@
     const subEl = document.getElementById('scoreboard-sub');
     const nextEl = document.getElementById('scoreboard-next');
 
-    titleEl.textContent = sb.isLastRound
-      ? 'Final Round Complete!'
-      : `Round ${sb.roundJustFinished} of ${sb.totalRounds} Complete`;
+    const sbKey = `${sb.roundJustFinished}`;
+    const animate = state._scoreboardSeen !== sbKey;
+    state._scoreboardSeen = sbKey;
+    document.getElementById('scoreboard-round-label').textContent = sb.isLastRound
+      ? 'Final round complete'
+      : `Round ${sb.roundJustFinished} of ${sb.totalRounds} complete`;
+    titleEl.textContent = 'Scoreboard';
+    const top = Object.entries(sb.deltas || {}).sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('scoreboard-winner').innerHTML = top && top[1] > 0
+      ? `🏆 Round winner: <strong>${escapeHtml(nameOf(top[0]))}</strong> <span class="delta">+${top[1]}</span>`
+      : '';
     subEl.textContent = sb.isLastRound
       ? 'Here are the scores before the final vote.'
       : `Next round starting soon…`;
@@ -776,10 +814,18 @@
         const li = document.createElement('li');
         const d = deltas[row.id] || 0;
         const deltaHtml = d > 0 ? `<span class="delta">+${d}</span>` : '';
+        li.style.setProperty('--i', i);
+        if (animate) li.classList.add('sb-enter');
         li.innerHTML = `<span class="rank">${i + 1}</span>
           <span class="name">${escapeHtml(row.name)}</span>
-          <span class="score">${row.s} 👍${deltaHtml}</span>`;
+          <span class="score"><span class="score-num">${row.s}</span> 👍${deltaHtml}</span>`;
         board.appendChild(li);
+        if (animate && d > 0) {
+          ThumbFx.countUp(li.querySelector('.score-num'), row.s - d, row.s, {
+            duration: 1400,
+            tick: i === 0 && !state.public.hasDisplay
+          });
+        }
       });
   }
 
@@ -893,6 +939,11 @@
   function renderResults() {
     renderTemplate('tpl-results');
     const r = state.public.results;
+    if (!state._resultsCelebrated) {
+      state._resultsCelebrated = true;
+      sfx('fanfare');
+      ThumbFx.confetti(r.champion === state.playerId ? 160 : 80);
+    }
     const players = state.public.players;
     const nameOf = (id) => {
       const p = players.find((x) => x.id === id);
@@ -1129,6 +1180,7 @@
         state.drawing._keyHandler = null;
       }
       if (phase === 'writing') state.suggestionCache = { personas: null, formats: null };
+      if (phase !== 'results') state._resultsCelebrated = false;
       if (phase === 'drawing') {
         if (state.drawing._pollInterval) clearInterval(state.drawing._pollInterval);
         if (state.drawing._autoSubmitInterval) clearInterval(state.drawing._autoSubmitInterval);

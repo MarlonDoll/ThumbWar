@@ -14,6 +14,22 @@
   roomPill.textContent = code;
 
   let state = { public: null };
+  // What the TV has already announced, so re-renders on every broadcast
+  // don't replay sounds and entrance animations.
+  const seen = { matchup: null, reveal: null, scoreboard: null, results: false };
+
+  const soundBtn = document.getElementById('sound-toggle');
+  function refreshSoundBtn() {
+    const on = ThumbFx.isUnlocked() && !ThumbFx.isMuted();
+    soundBtn.textContent = on ? '🔊 Sound on' : (ThumbFx.isMuted() ? '🔇 Sound off' : '🔇 Tap to enable sound');
+    soundBtn.classList.toggle('needs-tap', !ThumbFx.isUnlocked());
+  }
+  soundBtn.onclick = () => {
+    if (!ThumbFx.isUnlocked()) { ThumbFx.unlock(); ThumbFx.setMuted(false); }
+    else ThumbFx.setMuted(!ThumbFx.isMuted());
+    setTimeout(refreshSoundBtn, 100);
+  };
+  setInterval(refreshSoundBtn, 1000);
 
   socket.on('connect', () => {
     socket.emit('host-display', { code }, (res) => {
@@ -34,6 +50,7 @@
   function render() {
     const p = state.public;
     if (!p) return;
+    if (p.phase !== 'results') seen.results = false;
     if (p.phase === 'lobby') return renderLobby();
     if (p.phase === 'writing') return renderWriting();
     if (p.phase === 'drawing') return renderDrawing();
@@ -126,6 +143,17 @@
     }
     const m = v.matchup;
     const res = m.results;
+    const matchupKey = `${state.public.currentRound}:${v.index}`;
+    const isNew = seen.matchup !== matchupKey;
+    if (isNew) {
+      seen.matchup = matchupKey;
+      if (m.thumbnails.length > 1) ThumbFx.play('vs');
+    }
+    if (res && seen.reveal !== matchupKey) {
+      seen.reveal = matchupKey;
+      const total = Object.values(res.votes || {}).reduce((a, b) => a + b, 0);
+      ThumbFx.play(res.winners.length === 1 && total > 0 ? 'win' : 'tie');
+    }
     document.getElementById('host-vote-title').textContent = m.title.title;
     const voted = (m.votedBy || []).length;
     const sub = document.getElementById('host-vote-sub');
@@ -140,6 +168,7 @@
     row.innerHTML = '';
     row.classList.toggle('vs-3', m.thumbnails.length >= 3);
     row.classList.toggle('revealed', !!res);
+    row.classList.toggle('enter', isNew);
     m.thumbnails.forEach((t, i) => {
       if (i > 0) {
         const vs = document.createElement('div');
@@ -176,16 +205,20 @@
     useTpl('host-tpl-scoreboard');
     const sb = state.public.scoreboard;
     if (!sb) return;
-    const nameOf = (id) => {
-      const p = state.public.players.find((x) => x.id === id);
-      return p ? p.name : 'Unknown';
-    };
-    document.getElementById('host-sb-title').textContent = sb.isLastRound
-      ? 'Final Round Complete!'
-      : `Round ${sb.roundJustFinished} / ${sb.totalRounds} Complete`;
+    const key = `${sb.roundJustFinished}`;
+    const animate = seen.scoreboard !== key;
+    seen.scoreboard = key;
+    document.getElementById('host-sb-kicker').textContent = sb.isLastRound
+      ? 'Final round complete'
+      : `Round ${sb.roundJustFinished} of ${sb.totalRounds} complete`;
+    document.getElementById('host-sb-title').textContent = 'Scoreboard';
+    const deltas = sb.deltas || {};
+    const top = Object.entries(deltas).sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('host-sb-winner').innerHTML = top && top[1] > 0
+      ? `🏆 Round winner: <strong>${escapeHtml(nameOf(top[0]))}</strong> <span class="delta">+${top[1]}</span>`
+      : '';
     const board = document.getElementById('host-sb-list');
     board.innerHTML = '';
-    const deltas = sb.deltas || {};
     Object.entries(sb.scores)
       .map(([id, s]) => ({ id, s, name: nameOf(id) }))
       .sort((a, b) => b.s - a.s)
@@ -193,10 +226,15 @@
         const li = document.createElement('li');
         const d = deltas[row.id] || 0;
         const deltaHtml = d > 0 ? `<span class="delta">+${d}</span>` : '';
+        li.style.setProperty('--i', i);
+        if (animate) li.classList.add('sb-enter');
         li.innerHTML = `<span class="rank">${i + 1}</span>
           <span class="name">${escapeHtml(row.name)}</span>
-          <span class="score">${row.s} 👍${deltaHtml}</span>`;
+          <span class="score"><span class="score-num">${row.s}</span> 👍${deltaHtml}</span>`;
         board.appendChild(li);
+        if (animate && d > 0) {
+          ThumbFx.countUp(li.querySelector('.score-num'), row.s - d, row.s, { duration: 1400, tick: i === 0 });
+        }
       });
   }
 
@@ -231,6 +269,11 @@
   function renderResults() {
     useTpl('host-tpl-results');
     const r = state.public.results;
+    if (!seen.results) {
+      seen.results = true;
+      ThumbFx.play('fanfare');
+      ThumbFx.confetti();
+    }
     const nameOf = (id) => {
       const p = state.public.players.find((x) => x.id === id);
       return p ? p.name : 'Unknown';
@@ -323,13 +366,29 @@
     }
   }
 
-  // Timer
+  // Timer. Writing/drawing show a big clock (people are waiting on it);
+  // voting/browse/scoreboard use a small ring so the thumbnails get the room.
+  let timerTotal = null;
+  let timerFor = null;
   setInterval(() => {
+    const ring = document.getElementById('timer-ring');
     if (!state.public || !state.public.timerEndsAt) {
       timerPill.hidden = true;
       const big = document.getElementById('big-timer');
       if (big) big.textContent = '--:--';
+      if (ring) ring.hidden = true;
       return;
+    }
+    if (timerFor !== state.public.timerEndsAt) {
+      timerFor = state.public.timerEndsAt;
+      timerTotal = Math.max(1, timerFor - (Date.now() + (state.clockOffset || 0)));
+    }
+    if (ring) {
+      const left = Math.max(0, timerFor - (Date.now() + (state.clockOffset || 0)));
+      ring.hidden = false;
+      ring.style.setProperty('--p', (left / timerTotal).toFixed(3));
+      ring.classList.toggle('urgent', left <= 5000);
+      document.getElementById('timer-ring-text').textContent = Math.ceil(left / 1000);
     }
     const skew = state.clockOffset || 0;
     const remaining = Math.max(0, Math.round((state.public.timerEndsAt - (Date.now() + skew)) / 1000));

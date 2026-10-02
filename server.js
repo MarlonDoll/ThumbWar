@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 
 const { RoomManager, PHASES } = require('./src/rooms');
 const { generateRandomTitle } = require('./src/randomTitle');
+const hall = require('./src/hall');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +28,8 @@ app.get('/host', (_req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/random-title', (_req, res) => res.json(generateRandomTitle()));
+app.get('/api/hall', (_req, res) => res.json(hall.list()));
+app.use('/hall-images', express.static(hall.HALL_DIR, { maxAge: '7d' }));
 
 const rooms = new RoomManager(io);
 
@@ -91,7 +94,8 @@ io.on('connection', (socket) => {
     socket.data.isHostDisplay = true;
     room.hostDisplays.add(socket.id);
     cb({ ok: true });
-    socket.emit('state', rooms.publicState(room));
+    // Phones go quiet once a TV display is connected, so tell everyone.
+    broadcastState(room);
   });
 
   socket.on('set-spectator', ({ spectator }) => {
@@ -118,6 +122,7 @@ io.on('connection', (socket) => {
     if (cfg.draw) room.config.DRAW_SECONDS = clamp(cfg.draw, 60, 600);
     if (cfg.vote) room.config.VOTE_SECONDS = clamp(cfg.vote, 10, 120);
     if (cfg.browse) room.config.BROWSE_SECONDS = clamp(cfg.browse, 15, 180);
+    if (typeof cfg.hall === 'boolean') room.config.SHARE_HALL = cfg.hall;
     cb && cb({ ok: true });
     broadcastState(room);
   });
@@ -198,6 +203,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     if (socket.data.isHostDisplay) {
       room.hostDisplays.delete(socket.id);
+      broadcastState(room);
       return;
     }
     const p = room.players.find((x) => x.id === socket.data.playerId);

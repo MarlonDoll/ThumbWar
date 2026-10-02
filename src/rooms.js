@@ -3,6 +3,7 @@ const { pickRandomFormats } = require('./formats');
 const { buildAssignments, drawTasksByPlayer } = require('./pairings');
 const { zero, scoreMatchups, scoreAwards } = require('./scoring');
 const { generateRandomTitle } = require('./randomTitle');
+const hall = require('./hall');
 
 const PHASES = {
   LOBBY: 'lobby',
@@ -19,7 +20,9 @@ const DEFAULTS = {
   DRAW_SECONDS: 180,
   VOTE_SECONDS: 25,
   BROWSE_SECONDS: 30,
-  ROUNDS: 3
+  ROUNDS: 3,
+  // Off unless the host opts in: winners appear on the public homepage.
+  SHARE_HALL: false
 };
 
 // How long the winner reveal stays on screen between matchups.
@@ -556,6 +559,44 @@ class RoomManager {
       concepts: room.browse.concepts
     };
     room.phase = PHASES.RESULTS;
+    if (room.config.SHARE_HALL) this._addToHall(room, awardResults);
+  }
+
+  // Feature this game's Best Thumbnail (or, failing that, the most-voted
+  // matchup thumbnail) in the homepage Hall of Thumbs.
+  _addToHall(room, awardResults) {
+    const concepts = room.browse.concepts;
+    let concept = null;
+    let thumb = null;
+    const awardId = awardResults?.bestThumb?.winners?.[0];
+    if (awardId) {
+      for (const c of concepts) {
+        const t = (c.allThumbnails || []).find((x) => x.id === awardId);
+        if (t) { concept = c; thumb = t; break; }
+      }
+    }
+    if (!thumb) {
+      let best = 0;
+      for (const c of concepts) {
+        for (const t of c.allThumbnails || []) {
+          const v = (c.matchupVotes || {})[t.id] || 0;
+          if (v > best) { best = v; concept = c; thumb = t; }
+        }
+      }
+    }
+    if (!thumb) return;
+    const nameOf = (id) => room.players.find((p) => p.id === id)?.name || 'Someone';
+    try {
+      hall.add({
+        png: thumb.png,
+        title: concept.title.title,
+        creator: concept.title.persona,
+        writer: nameOf(concept.writerId),
+        artist: nameOf(thumb.artistId)
+      });
+    } catch (e) {
+      console.error('Hall of Thumbs: add failed', e);
+    }
   }
 
   _computeStats(room, scores) {
@@ -696,6 +737,7 @@ class RoomManager {
       })),
       timerEndsAt: room.timerEndsAt,
       serverNow: Date.now(),
+      hasDisplay: room.hostDisplays.size > 0,
       config: room.config,
       currentRound: room.currentRound || 0,
       totalRounds: room.config.ROUNDS || 1

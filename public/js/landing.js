@@ -17,42 +17,70 @@
   const joinError = document.getElementById('join-error');
   const resumeLink = document.getElementById('resume-link');
 
-  // Render featured grid. Cards whose image is missing hide themselves, and
-  // if none load we hide the whole section so there are no broken images.
+  // Render the Hall of Thumbs: winners from recent games whose host opted in
+  // (newest first), topped up with the hand-picked FEATURED cards. Cards
+  // whose image is missing hide themselves; if none load, the whole section
+  // hides so there are no broken images.
   const featuredGrid = document.getElementById('featured-grid');
   const featuredSection = document.querySelector('.featured-section');
-  if (featuredGrid) {
+  const MAX_CARDS = 8;
+
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  function renderHall(cards) {
+    if (!featuredGrid) return;
     let loaded = 0;
     let settled = 0;
-    const total = FEATURED.length;
+    const total = cards.length;
     const maybeHideSection = () => {
-      if (settled === total && loaded === 0 && featuredSection) {
-        featuredSection.hidden = true;
-      }
+      if (settled === total && loaded === 0 && featuredSection) featuredSection.hidden = true;
     };
-    if (total === 0 && featuredSection) {
-      featuredSection.hidden = true;
-    }
-    for (const f of FEATURED) {
+    if (total === 0 && featuredSection) featuredSection.hidden = true;
+    for (const f of cards) {
       const card = document.createElement('div');
       card.className = 'featured-card';
       const img = document.createElement('img');
       img.alt = f.title;
+      img.loading = 'lazy';
       img.onload = () => { loaded++; settled++; maybeHideSection(); };
       img.onerror = () => { settled++; card.remove(); maybeHideSection(); };
-      img.src = `/images/featured/${f.file}`;
+      img.src = f.image;
       const meta = document.createElement('div');
       meta.className = 'featured-meta';
       meta.innerHTML = `
-        <div class="featured-card-title">${f.title}</div>
-        <div class="featured-card-creator">${f.creator}</div>
-        ${f.winner ? `<div class="featured-card-winner">drawn by ${f.winner}</div>` : ''}
+        <div class="featured-card-title">${escapeHtml(f.title)}</div>
+        <div class="featured-card-creator">${escapeHtml(f.creator)}</div>
+        ${f.artist ? `<div class="featured-card-winner">drawn by ${escapeHtml(f.artist)}</div>` : ''}
+        ${f.recent ? '<div class="featured-card-new">New</div>' : ''}
       `;
       card.appendChild(img);
       card.appendChild(meta);
       featuredGrid.appendChild(card);
     }
   }
+
+  const curated = FEATURED.map((f) => ({
+    image: `/images/featured/${f.file}`,
+    title: f.title,
+    creator: f.creator,
+    artist: f.winner
+  }));
+  fetch('/api/hall')
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => [])
+    .then((recent) => {
+      const DAY = 24 * 60 * 60 * 1000;
+      const fromGames = (Array.isArray(recent) ? recent : []).map((e) => ({
+        image: e.image,
+        title: e.title,
+        creator: e.creator,
+        artist: e.artist,
+        recent: Date.now() - (e.at || 0) < DAY
+      }));
+      renderHall([...fromGames, ...curated].slice(0, MAX_CARDS));
+    });
 
   // Code box elements
   const codeBoxes = joinForm.querySelectorAll('.code-box');
@@ -61,7 +89,7 @@
   try {
     const saved = JSON.parse(localStorage.getItem('thumbwar:session') || 'null');
     if (saved && saved.code && saved.playerId) {
-      resumeLink.hidden = false;
+      document.getElementById('resume-wrap').hidden = false;
       resumeLink.href = `/play?code=${saved.code}`;
     }
   } catch {}
